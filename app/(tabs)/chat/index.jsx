@@ -179,50 +179,55 @@ const ChatScreen = () => {
     return date.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })
   }
 
-  const renderChatRoom = ({ item }) => (
-    <TouchableOpacity
-      style={styles.chatRoomItem}
-      onPress={() => router.push({
-        pathname: '/chat/room',
-        params: { roomId: item.roomId, roomName: item.roomName }
-      })}
-    >
-      <View style={styles.profileImageContainer}>
-        <View style={styles.profileImage}>
-          <Text style={styles.profileText}>
-            {item.roomName.charAt(0)}
-          </Text>
-        </View>
-      </View>
+  const renderChatRoom = ({ item }) => {
+    // roomName이 null이거나 undefined인 경우 기본값 설정
+    const displayName = item.roomName || '알 수 없는 채팅방'
 
-      <View style={styles.chatRoomContent}>
-        <View style={styles.chatRoomHeader}>
-          <Text style={styles.roomName}>
-            {item.roomName}
-            {item.roomType === 'GROUP' && (
-              <Text style={styles.participantCount}> {item.participantCount}</Text>
+    return (
+      <TouchableOpacity
+        style={styles.chatRoomItem}
+        onPress={() => router.push({
+          pathname: '/chat/room',
+          params: { roomId: item.roomId, roomName: displayName }
+        })}
+      >
+        <View style={styles.profileImageContainer}>
+          <View style={styles.profileImage}>
+            <Text style={styles.profileText}>
+              {displayName.charAt(0)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.chatRoomContent}>
+          <View style={styles.chatRoomHeader}>
+            <Text style={styles.roomName}>
+              {displayName}
+              {item.roomType === 'GROUP' && item.participantCount && (
+                <Text style={styles.participantCount}> {item.participantCount}</Text>
+              )}
+            </Text>
+            <Text style={styles.lastMessageTime}>
+              {item.lastMessageAt ? formatTime(item.lastMessageAt) : ''}
+            </Text>
+          </View>
+
+          <View style={styles.chatRoomFooter}>
+            <Text style={styles.lastMessage} numberOfLines={1}>
+              {item.lastMessage || '메시지가 없습니다'}
+            </Text>
+            {item.unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadText}>
+                  {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                </Text>
+              </View>
             )}
-          </Text>
-          <Text style={styles.lastMessageTime}>
-            {formatTime(item.lastMessageAt)}
-          </Text>
+          </View>
         </View>
-
-        <View style={styles.chatRoomFooter}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.lastMessage}
-          </Text>
-          {item.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>
-                {item.unreadCount > 99 ? '99+' : item.unreadCount}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  )
+      </TouchableOpacity>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
