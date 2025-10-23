@@ -12,6 +12,12 @@ const TabLayout = () => {
         }}
       />
       <Tabs.Screen 
+        name='myFarm'
+        options={{
+          title:'마이팜'
+        }}
+      />
+      <Tabs.Screen 
         name='chat'
         options={{
           title:'채팅'
@@ -21,12 +27,6 @@ const TabLayout = () => {
         name='myPage'
         options={{
           title:'마이페이지'
-        }}
-      />
-      <Tabs.Screen 
-        name='menu'
-        options={{
-          title:'전체메뉴'
         }}
       />
     </Tabs>
