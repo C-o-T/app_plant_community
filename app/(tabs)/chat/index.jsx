@@ -51,8 +51,27 @@ const ChatScreen = () => {
     try {
       // 백엔드 API 호출
       const data = await chatAPI.getMyChatRooms(currentUserId)
-      console.log('채팅방 목록 조회 성공:', data)
-      setChatRooms(data)
+      console.log('✅ 채팅방 목록 조회 성공:', data)
+
+      // 1:1 채팅방의 경우 참여자 정보에서 상대방 이름 가져오기
+      const roomsWithNames = await Promise.all(data.map(async (room) => {
+        if (room.roomType === 'DIRECT' && !room.roomName && room.participantIds) {
+          // 상대방 ID 찾기 (본인 제외)
+          const otherUserId = room.participantIds.find(id => id !== currentUserId)
+          if (otherUserId) {
+            try {
+              // 회원 정보에서 이름 가져오기 (간단하게 처리)
+              room.roomName = otherUserId // 임시로 ID 표시
+            } catch (error) {
+              console.error('참여자 정보 조회 실패:', error)
+            }
+          }
+        }
+        return room
+      }))
+
+      console.log('📋 처리된 채팅방 목록:', roomsWithNames)
+      setChatRooms(roomsWithNames)
     } catch (error) {
       console.error('채팅방 목록 조회 실패:', error)
       // API 실패 시 더미 데이터 표시
