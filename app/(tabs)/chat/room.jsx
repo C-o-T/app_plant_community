@@ -78,12 +78,16 @@ const ChatRoomScreen = () => {
         // 채팅방 구독
         webSocketService.subscribeToRoom(roomId, (message) => {
           console.log('📨 새 메시지 수신:', message)
+          console.log('🔍 내 ID:', currentUserId, '/ 보낸 사람 ID:', message.senderId)
 
           // 받은 메시지를 목록에 추가
           setMessages((prev) => {
-            // msgId가 없으면 임시로 생성 (백엔드에서 안 보내주는 경우)
-            if (!message.msgId) {
+            console.log('📋 현재 메시지 개수:', prev.length)
+
+            // msgId가 0이거나 없으면 임시로 생성
+            if (!message.msgId || message.msgId === 0) {
               message.msgId = `ws-${Date.now()}-${Math.random()}`
+              console.log('🆔 msgId 생성:', message.msgId)
             }
 
             // 중복 방지: 같은 내용과 시간의 메시지가 있으면 추가하지 않음
@@ -94,11 +98,14 @@ const ChatRoomScreen = () => {
             )
 
             if (isDuplicate) {
-              console.log('중복 메시지 무시:', message.content)
+              console.log('⚠️ 중복 메시지 무시:', message.content)
               return prev
             }
 
-            return [...prev, message]
+            console.log('✅ 메시지 추가됨:', message.content)
+            const newMessages = [...prev, message]
+            console.log('📋 새 메시지 개수:', newMessages.length)
+            return newMessages
           })
 
           // 자동 스크롤
