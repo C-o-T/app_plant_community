@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { chatAPI } from '../../../utils/api'
+import * as SecureStore from 'expo-secure-store'
 
 const ChatScreen = () => {
   const [chatRooms, setChatRooms] = useState([])
@@ -12,8 +13,8 @@ const ChatScreen = () => {
   const [selectedUsers, setSelectedUsers] = useState([])
   const [groupName, setGroupName] = useState('')
 
-  // TODO: 실제 사용자 ID로 교체 필요
-  const currentUserId = 'user123'
+  // 로그인한 사용자 정보
+  const [currentUserId, setCurrentUserId] = useState('')
 
   // 더미 사용자 목록 (나중에 실제 API로 교체)
   const dummyUsers = [
@@ -23,9 +24,32 @@ const ChatScreen = () => {
     { memId: 'user202', memName: '박민수', memEmail: 'park@test.com' },
   ]
 
+  // 로그인 정보 불러오기
   useEffect(() => {
-    fetchChatRooms()
+    const loadUserInfo = async () => {
+      try {
+        const userInfoString = await SecureStore.getItemAsync('loginInfo')
+        if (userInfoString) {
+          const userInfo = JSON.parse(userInfoString)
+          setCurrentUserId(userInfo.memId)
+        } else {
+          // 로그인 정보가 없으면 로그인 페이지로 이동
+          console.warn('로그인 정보가 없습니다.')
+          router.replace('/auth/login')
+        }
+      } catch (error) {
+        console.error('사용자 정보 로드 실패:', error)
+      }
+    }
+
+    loadUserInfo()
   }, [])
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchChatRooms()
+    }
+  }, [currentUserId])
 
   const fetchChatRooms = async () => {
     try {
