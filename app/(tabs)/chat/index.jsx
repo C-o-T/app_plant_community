@@ -54,21 +54,19 @@ const ChatScreen = () => {
       console.log('✅ 채팅방 목록 조회 성공:', data)
 
       // 1:1 채팅방의 경우 참여자 정보에서 상대방 이름 가져오기
-      const roomsWithNames = await Promise.all(data.map(async (room) => {
+      const roomsWithNames = data.map((room) => {
         if (room.roomType === 'DIRECT' && !room.roomName && room.participantIds) {
+          // participantIds는 쉼표로 구분된 문자열 ("kimfarm,parkfarm")
+          const participantArray = room.participantIds.split(',')
           // 상대방 ID 찾기 (본인 제외)
-          const otherUserId = room.participantIds.find(id => id !== currentUserId)
+          const otherUserId = participantArray.find(id => id !== currentUserId)
           if (otherUserId) {
-            try {
-              // 회원 정보에서 이름 가져오기 (간단하게 처리)
-              room.roomName = otherUserId // 임시로 ID 표시
-            } catch (error) {
-              console.error('참여자 정보 조회 실패:', error)
-            }
+            // 상대방 ID를 roomName으로 설정 (임시)
+            room.roomName = otherUserId
           }
         }
         return room
-      }))
+      })
 
       console.log('📋 처리된 채팅방 목록:', roomsWithNames)
       setChatRooms(roomsWithNames)
