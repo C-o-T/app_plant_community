@@ -1,5 +1,5 @@
 import { StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native'
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Button from '../../../components/common/Button'
 import { useRouter } from 'expo-router'
@@ -8,12 +8,24 @@ import * as SecureStore from 'expo-secure-store'
 
 const MyPageScreen = () => {
   const router = useRouter();
-  const loginInfo = SecureStore.getItem('loginInfo');
-  console.log(loginInfo)
+  const [loginInfo, setLoginInfo] = useState(null);
 
-  //logout 실행시 실행할 함수?
-  const handleLogout = () => {
-    SecureStore.deleteItemAsync('loginInfo')
+  useEffect(() => {
+    // 로그인 정보 가져오기
+    const getLoginInfo = async () => {
+      const info = await SecureStore.getItemAsync('loginInfo');
+      if (info) {
+        setLoginInfo(JSON.parse(info));
+      }
+    };
+    getLoginInfo();
+  }, []);
+
+  //logout 실행시 실행할 함수
+  const handleLogout = async () => {
+    await SecureStore.deleteItemAsync('loginInfo');
+    setLoginInfo(null);
+    router.replace('/auth/login');
   }
 
   return (
@@ -28,13 +40,9 @@ const MyPageScreen = () => {
               onPress={()=>router.push('/auth/login')}
               />
               :
-              <Button 
+              <Button
                 title='로그아웃'
-                onPress={()=>{
-                  handleLogout();
-                  router.canDismiss() && router.dismissAll();
-                  router.push('/');
-                }}
+                onPress={handleLogout}
               />
             }
             
