@@ -14,6 +14,7 @@ import {
   View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import * as SecureStore from 'expo-secure-store'
 
 const ChatRoomScreen = () => {
   const { roomId, roomName } = useLocalSearchParams()
@@ -23,11 +24,36 @@ const ChatRoomScreen = () => {
   const [wsConnected, setWsConnected] = useState(false)
   const flatListRef = useRef(null)
 
-  // TODO: 실제 사용자 ID로 교체 필요
-  const currentUserId = 'user123'
-  const currentUserName = '나'
+  // 로그인한 사용자 정보
+  const [currentUserId, setCurrentUserId] = useState('')
+  const [currentUserName, setCurrentUserName] = useState('')
+
+  // 로그인 정보 불러오기
+  useEffect(() => {
+    const loadUserInfo = async () => {
+      try {
+        const userInfoString = await SecureStore.getItemAsync('loginInfo')
+        if (userInfoString) {
+          const userInfo = JSON.parse(userInfoString)
+          setCurrentUserId(userInfo.memId)
+          setCurrentUserName(userInfo.memName)
+        } else {
+          // 로그인 정보가 없으면 로그인 페이지로 이동
+          console.warn('로그인 정보가 없습니다.')
+          router.replace('/auth/login')
+        }
+      } catch (error) {
+        console.error('사용자 정보 로드 실패:', error)
+      }
+    }
+
+    loadUserInfo()
+  }, [])
 
   useEffect(() => {
+    // 사용자 정보가 로드된 후에만 실행
+    if (!currentUserId || !currentUserName) return
+
     // WebSocket 연결
     connectWebSocket()
 
@@ -41,7 +67,7 @@ const ChatRoomScreen = () => {
         webSocketService.unsubscribeFromRoom(roomId)
       }
     }
-  }, [])
+  }, [currentUserId, currentUserName])
 
   const connectWebSocket = () => {
     webSocketService.connect(

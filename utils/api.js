@@ -1,7 +1,7 @@
 // API 기본 설정
 // 서버를 실행하는 컴퓨터의 IP 주소로 변경하세요
 // 예: export const API_BASE_URL = 'http://192.168.30.151:8080'
-export const API_BASE_URL = 'http://192.168.30.151:8080' // 서버 컴퓨터 IP:포트
+export const API_BASE_URL = 'http://192.168.30.97:8080' // 서버 컴퓨터 IP:포트
 
 // API 엔드포인트
 export const API_ENDPOINTS = {
