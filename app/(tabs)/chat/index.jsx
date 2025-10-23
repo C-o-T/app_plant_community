@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { chatAPI } from '../../../utils/api'
+import { chatAPI, memberAPI } from '../../../utils/api'
 import * as SecureStore from 'expo-secure-store'
 
 const ChatScreen = () => {
@@ -16,13 +16,9 @@ const ChatScreen = () => {
   // 로그인한 사용자 정보
   const [currentUserId, setCurrentUserId] = useState('')
 
-  // 더미 사용자 목록 (나중에 실제 API로 교체)
-  const dummyUsers = [
-    { memId: 'user456', memName: '홍길동', memEmail: 'hong@test.com' },
-    { memId: 'user789', memName: '김철수', memEmail: 'kim@test.com' },
-    { memId: 'user101', memName: '이영희', memEmail: 'lee@test.com' },
-    { memId: 'user202', memName: '박민수', memEmail: 'park@test.com' },
-  ]
+  // 회원 목록 (실제 API에서 가져옴)
+  const [members, setMembers] = useState([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
 
   // 로그인 정보 불러오기
   useEffect(() => {
@@ -53,12 +49,13 @@ const ChatScreen = () => {
 
   const fetchChatRooms = async () => {
     try {
-      // TODO: 백엔드 API 연동
-      const response = await fetch(`http://192.168.30.151:8080/api/chat/rooms/${currentUserId}`)
-      const data = await response.json()
+      // 백엔드 API 호출
+      const data = await chatAPI.getMyChatRooms(currentUserId)
+      console.log('채팅방 목록 조회 성공:', data)
       setChatRooms(data)
-
-      // 임시 더미 데이터
+    } catch (error) {
+      console.error('채팅방 목록 조회 실패:', error)
+      // API 실패 시 더미 데이터 표시
       const dummyData = [
         {
           roomId: 1,
@@ -80,10 +77,36 @@ const ChatScreen = () => {
         }
       ]
       setChatRooms(dummyData)
-    } catch (error) {
-      console.error('채팅방 목록 조회 실패:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 회원 목록 불러오기
+  const fetchMembers = async () => {
+    console.log('🔄 회원 목록 불러오기 시작...')
+    setLoadingMembers(true)
+    try {
+      const data = await memberAPI.getAllMembers()
+      console.log('✅ 회원 목록 조회 성공:', data)
+      // 본인은 제외
+      const filteredMembers = data.filter(member => member.memId !== currentUserId)
+      setMembers(filteredMembers)
+    } catch (error) {
+      console.error('❌ 회원 목록 조회 실패:', error)
+      // API 실패 시 더미 데이터 표시
+      console.log('📋 더미 회원 데이터 표시')
+      const dummyMembers = [
+        { memId: 'user456', memName: '홍길동', memEmail: 'hong@test.com' },
+        { memId: 'user789', memName: '김철수', memEmail: 'kim@test.com' },
+        { memId: 'user101', memName: '이영희', memEmail: 'lee@test.com' },
+        { memId: 'user202', memName: '박민수', memEmail: 'park@test.com' },
+      ]
+      setMembers(dummyMembers)
+      console.log('✅ 더미 회원 설정 완료:', dummyMembers.length, '명')
+    } finally {
+      console.log('🏁 로딩 종료 - setLoadingMembers(false)')
+      setLoadingMembers(false)
     }
   }
 
@@ -125,7 +148,7 @@ const ChatScreen = () => {
       await fetchChatRooms()
 
       // 새로 만든 채팅방으로 이동
-      const selectedUserName = dummyUsers.find(u => u.memId === selectedUsers[0])?.memName || '채팅방'
+      const selectedUserName = members.find(u => u.memId === selectedUsers[0])?.memName || '채팅방'
       router.push({
         pathname: '/chat/room',
         params: {
@@ -207,7 +230,10 @@ const ChatScreen = () => {
         <Text style={styles.headerTitle}>채팅</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => setShowCreateModal(true)}
+          onPress={() => {
+            setShowCreateModal(true)
+            fetchMembers() // 모달 열 때 회원 목록 불러오기
+          }}
         >
           <Ionicons name="add-outline" size={28} color="#000" />
         </TouchableOpacity>
@@ -277,41 +303,49 @@ const ChatScreen = () => {
             )}
           </View>
 
-          <FlatList
-            data={dummyUsers}
-            keyExtractor={(item) => item.memId}
-            renderItem={({ item }) => {
-              const isSelected = selectedUsers.includes(item.memId)
-              return (
-                <TouchableOpacity
-                  style={styles.userItem}
-                  onPress={() => toggleUserSelection(item.memId)}
-                >
-                  <View style={styles.userInfo}>
-                    <View style={styles.userAvatar}>
-                      <Text style={styles.userAvatarText}>
-                        {item.memName.charAt(0)}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text style={styles.userName}>{item.memName}</Text>
-                      <Text style={styles.userEmail}>{item.memEmail}</Text>
-                    </View>
-                  </View>
-                  <View
-                    style={[
-                      styles.checkbox,
-                      isSelected && styles.checkboxSelected,
-                    ]}
+          {loadingMembers ? (
+            <View style={styles.centerContainer}>
+              <Text>회원 목록 불러오는 중...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={members}
+              keyExtractor={(item) => item.memId}
+              renderItem={({ item }) => {
+                const isSelected = selectedUsers.includes(item.memId)
+                return (
+                  <TouchableOpacity
+                    style={styles.userItem}
+                    onPress={() => toggleUserSelection(item.memId)}
                   >
-                    {isSelected && (
-                      <Ionicons name="checkmark" size={18} color="#fff" />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              )
-            }}
-          />
+                    <View style={styles.userInfo}>
+                      <View style={styles.userAvatar}>
+                        <Text style={styles.userAvatarText}>
+                          {item.memName.charAt(0)}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={styles.userName}>{item.memName}</Text>
+                        {item.memEmail && (
+                          <Text style={styles.userEmail}>{item.memEmail}</Text>
+                        )}
+                      </View>
+                    </View>
+                    <View
+                      style={[
+                        styles.checkbox,
+                        isSelected && styles.checkboxSelected,
+                      ]}
+                    >
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={18} color="#fff" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )
+              }}
+            />
+          )}
         </SafeAreaView>
       </Modal>
     </SafeAreaView>

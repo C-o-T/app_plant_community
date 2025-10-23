@@ -1,10 +1,12 @@
 // API 기본 설정
-// 서버를 실행하는 컴퓨터의 IP 주소로 변경하세요
-// 예: export const API_BASE_URL = 'http://192.168.30.151:8080'
-export const API_BASE_URL = 'http://192.168.30.97:8080' // 서버 컴퓨터 IP:포트
+// Android Emulator는 10.0.2.2 사용, 실제 디바이스는 192.168.30.97 사용
+export const API_BASE_URL = 'http://10.0.2.2:5000' // 에뮬레이터용
 
 // API 엔드포인트
 export const API_ENDPOINTS = {
+  // 회원
+  GET_ALL_MEMBERS: '/members/admin',
+
   // 채팅방
   GET_MY_CHAT_ROOMS: (memId) => `/api/chat/rooms/${memId}`,
   GET_CHAT_ROOM: (roomId) => `/api/chat/room/${roomId}`,
@@ -28,6 +30,10 @@ export const API_ENDPOINTS = {
 
 // 공통 fetch 함수
 const apiFetch = async (url, options = {}) => {
+  // timeout 설정 (5초)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 5000)
+
   try {
     const response = await fetch(`${API_BASE_URL}${url}`, {
       headers: {
@@ -35,7 +41,10 @@ const apiFetch = async (url, options = {}) => {
         ...options.headers,
       },
       ...options,
+      signal: controller.signal,
     })
+
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
@@ -43,6 +52,11 @@ const apiFetch = async (url, options = {}) => {
 
     return await response.json()
   } catch (error) {
+    clearTimeout(timeoutId)
+    if (error.name === 'AbortError') {
+      console.error('API Timeout:', url)
+      throw new Error('요청 시간 초과')
+    }
     console.error('API Error:', error)
     throw error
   }
@@ -130,5 +144,13 @@ export const chatAPI = {
   // 안 읽은 메시지 수
   getUnreadCount: async (memId, roomId) => {
     return await apiFetch(API_ENDPOINTS.GET_UNREAD_COUNT(memId, roomId))
+  },
+}
+
+// 회원 API 함수들
+export const memberAPI = {
+  // 전체 회원 목록 조회
+  getAllMembers: async () => {
+    return await apiFetch(API_ENDPOINTS.GET_ALL_MEMBERS)
   },
 }
