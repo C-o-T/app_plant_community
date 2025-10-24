@@ -1,10 +1,11 @@
 import { FlatList, StyleSheet, Text, TouchableOpacity, View, Modal, TextInput } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { chatAPI, memberAPI } from '../../../utils/api'
 import * as SecureStore from 'expo-secure-store'
+import webSocketService from '../../../utils/websocket'
 
 const ChatScreen = () => {
   const [chatRooms, setChatRooms] = useState([])
@@ -44,8 +45,50 @@ const ChatScreen = () => {
   useEffect(() => {
     if (currentUserId) {
       fetchChatRooms()
+      connectWebSocket()
     }
   }, [currentUserId])
+
+  // 화면 포커스 시 채팅방 목록 새로고침
+  useFocusEffect(
+    React.useCallback(() => {
+      if (currentUserId) {
+        console.log('🔄 채팅방 목록 화면 포커스 - 목록 새로고침')
+        fetchChatRooms()
+      }
+    }, [currentUserId])
+  )
+
+  // WebSocket 연결 및 전체 메시지 구독
+  const connectWebSocket = () => {
+    webSocketService.connect(
+      () => {
+        console.log('✅ 채팅방 목록 - WebSocket 연결 성공')
+
+        // 전체 메시지 구독 (모든 채팅방의 메시지를 받기 위해)
+        webSocketService.subscribeToAllMessages((message) => {
+          console.log('📨 새 메시지 수신 (목록 화면):', message)
+
+          // 해당 채팅방의 마지막 메시지 업데이트
+          setChatRooms((prevRooms) => {
+            return prevRooms.map((room) => {
+              if (room.roomId === message.roomId) {
+                return {
+                  ...room,
+                  lastMessage: message.content,
+                  lastMessageAt: message.sentAt,
+                }
+              }
+              return room
+            })
+          })
+        })
+      },
+      () => {
+        console.log('⚠️ 채팅방 목록 - WebSocket 연결 실패')
+      }
+    )
+  }
 
   const fetchChatRooms = async () => {
     try {
@@ -53,17 +96,33 @@ const ChatScreen = () => {
       const data = await chatAPI.getMyChatRooms(currentUserId)
       console.log('✅ 채팅방 목록 조회 성공:', data)
 
+      // 회원 정보 조회 (이름 변환용)
+      let memberMap = new Map()
+      try {
+        const members = await memberAPI.getAllMembers()
+        members.forEach(member => {
+          memberMap.set(member.memId, member.memName)
+        })
+        console.log('✅ 회원 정보 로드 완료:', memberMap.size, '명')
+      } catch (error) {
+        console.warn('⚠️ 회원 정보 로드 실패 - ID로 표시됩니다')
+      }
+
       // 1:1 채팅방의 경우 참여자 정보에서 상대방 이름 가져오기
       const roomsWithNames = data.map((room) => {
         if (room.roomType === 'DIRECT' && !room.roomName && room.participantIds) {
           // participantIds는 쉼표로 구분된 문자열 ("kimfarm,parkfarm")
-          const participantArray = room.participantIds.split(',')
+          const participantArray = room.participantIds.split(',').map(id => id.trim())
           // 상대방 ID 찾기 (본인 제외)
           const otherUserId = participantArray.find(id => id !== currentUserId)
           if (otherUserId) {
-            // 상대방 ID를 roomName으로 설정 (임시)
-            room.roomName = otherUserId
+            // 회원 정보에서 이름 찾기, 없으면 ID 사용
+            room.roomName = memberMap.get(otherUserId) || otherUserId
           }
+        }
+        // 단체 채팅방도 roomName이 null이면 기본값 설정
+        if (room.roomType === 'GROUP' && !room.roomName) {
+          room.roomName = '단체 채팅방'
         }
         return room
       })

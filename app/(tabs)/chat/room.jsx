@@ -18,6 +18,8 @@ import * as SecureStore from 'expo-secure-store'
 
 const ChatRoomScreen = () => {
   const { roomId, roomName } = useLocalSearchParams()
+  console.log('🏠 채팅방 입장 - roomId:', roomId, '/ roomName:', roomName)
+
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(true)
@@ -168,18 +170,22 @@ const ChatRoomScreen = () => {
     setInputText('') // 입력창 바로 비우기
 
     const newMessage = {
-      msgId: Date.now(),
       roomId: parseInt(roomId),
       senderId: currentUserId,
       senderName: currentUserName,
       content: messageContent,
-      sentAt: new Date().toISOString(),
       messageType: 'TEXT',
     }
 
     try {
+      // 1. DB에 메시지 저장 (API 호출)
+      console.log('💾 DB에 메시지 저장 중...')
+      const savedMessage = await chatAPI.sendMessage(newMessage)
+      console.log('✅ DB에 메시지 저장 완료:', savedMessage)
+
+      // 2. WebSocket으로 실시간 전송
       if (wsConnected) {
-        // WebSocket 연결되어 있으면 WebSocket으로 전송 (실시간)
+        console.log('📡 WebSocket으로 실시간 전송')
         webSocketService.sendMessage(
           roomId,
           currentUserId,
@@ -190,7 +196,11 @@ const ChatRoomScreen = () => {
       } else {
         // WebSocket 연결 안 되어 있으면 로컬에 바로 추가 (더미 모드)
         console.log('더미 모드: 로컬에만 메시지 추가')
-        setMessages((prev) => [...prev, newMessage])
+        setMessages((prev) => [...prev, {
+          ...savedMessage,
+          msgId: savedMessage.msgId || Date.now(),
+          sentAt: savedMessage.sentAt || new Date().toISOString(),
+        }])
       }
 
       // 메시지 전송 후 스크롤 하단으로 이동
@@ -198,9 +208,13 @@ const ChatRoomScreen = () => {
         flatListRef.current?.scrollToEnd({ animated: true })
       }, 100)
     } catch (error) {
-      console.error('메시지 전송 실패:', error)
-      // 실패해도 로컬에는 추가
-      setMessages((prev) => [...prev, newMessage])
+      console.error('❌ 메시지 전송 실패:', error)
+      // 실패해도 로컬에는 추가 (임시)
+      setMessages((prev) => [...prev, {
+        ...newMessage,
+        msgId: `temp-${Date.now()}`,
+        sentAt: new Date().toISOString(),
+      }])
     }
   }
 
