@@ -98,6 +98,39 @@ class WebSocketService {
     }
   }
 
+  // 모든 메시지 구독 (채팅방 목록 화면용)
+  subscribeToAllMessages(onMessageReceived) {
+    if (!this.connected || !this.client) {
+      console.error('WebSocket이 연결되지 않았습니다')
+      return null
+    }
+
+    const destination = '/topic/messages'
+
+    const subscription = this.client.subscribe(destination, (message) => {
+      const receivedMessage = JSON.parse(message.body)
+      console.log('전체 메시지 수신:', receivedMessage)
+      if (onMessageReceived) {
+        onMessageReceived(receivedMessage)
+      }
+    })
+
+    this.subscriptions.set('all-messages', subscription)
+    console.log('전체 메시지 구독 완료')
+
+    return subscription
+  }
+
+  // 전체 메시지 구독 해제
+  unsubscribeFromAllMessages() {
+    const subscription = this.subscriptions.get('all-messages')
+    if (subscription) {
+      subscription.unsubscribe()
+      this.subscriptions.delete('all-messages')
+      console.log('전체 메시지 구독 해제')
+    }
+  }
+
   // 채팅방 입장
   joinRoom(roomId, userId, userName) {
     if (!this.connected || !this.client) {
