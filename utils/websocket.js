@@ -15,16 +15,14 @@ class WebSocketService {
     this.client = new Client({
       webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws-chat`),
 
-      debug: (str) => {
-        console.log('STOMP Debug:', str)
-      },
+      // 디버그 로그 비활성화 (프로덕션)
+      debug: () => {},
 
       reconnectDelay: 5000, // 5초마다 재연결 시도
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
 
-      onConnect: (frame) => {
-        console.log('WebSocket 연결 성공:', frame)
+      onConnect: () => {
         this.connected = true
         if (onConnected) onConnected()
       },
@@ -42,7 +40,6 @@ class WebSocketService {
       },
 
       onDisconnect: () => {
-        console.log('WebSocket 연결 해제')
         this.connected = false
       },
     })
@@ -61,7 +58,6 @@ class WebSocketService {
 
       this.client.deactivate()
       this.connected = false
-      console.log('WebSocket 연결 종료')
     }
   }
 
@@ -76,15 +72,12 @@ class WebSocketService {
 
     const subscription = this.client.subscribe(destination, (message) => {
       const receivedMessage = JSON.parse(message.body)
-      console.log('메시지 수신:', receivedMessage)
       if (onMessageReceived) {
         onMessageReceived(receivedMessage)
       }
     })
 
     this.subscriptions.set(roomId, subscription)
-    console.log(`채팅방 ${roomId} 구독 완료`)
-
     return subscription
   }
 
@@ -94,7 +87,6 @@ class WebSocketService {
     if (subscription) {
       subscription.unsubscribe()
       this.subscriptions.delete(roomId)
-      console.log(`채팅방 ${roomId} 구독 해제`)
     }
   }
 
@@ -109,15 +101,12 @@ class WebSocketService {
 
     const subscription = this.client.subscribe(destination, (message) => {
       const receivedMessage = JSON.parse(message.body)
-      console.log('전체 메시지 수신:', receivedMessage)
       if (onMessageReceived) {
         onMessageReceived(receivedMessage)
       }
     })
 
     this.subscriptions.set('all-messages', subscription)
-    console.log('전체 메시지 구독 완료')
-
     return subscription
   }
 
@@ -127,7 +116,6 @@ class WebSocketService {
     if (subscription) {
       subscription.unsubscribe()
       this.subscriptions.delete('all-messages')
-      console.log('전체 메시지 구독 해제')
     }
   }
 
@@ -149,8 +137,6 @@ class WebSocketService {
       destination: `/app/chat.join/${roomId}`,
       body: JSON.stringify(message),
     })
-
-    console.log(`채팅방 ${roomId} 입장`)
   }
 
   // 채팅방 퇴장
@@ -171,8 +157,6 @@ class WebSocketService {
       destination: `/app/chat.leave/${roomId}`,
       body: JSON.stringify(message),
     })
-
-    console.log(`채팅방 ${roomId} 퇴장`)
   }
 
   // 메시지 전송
@@ -194,8 +178,6 @@ class WebSocketService {
       destination: `/app/chat.send/${roomId}`,
       body: JSON.stringify(message),
     })
-
-    console.log('메시지 전송:', message)
   }
 
   // 입력 중 알림
