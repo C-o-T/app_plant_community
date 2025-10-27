@@ -1,13 +1,14 @@
 import { StyleSheet, Text, View } from 'react-native'
 import React from 'react'
-import { Stack } from 'expo-router'
 
-const _layout = () => {
+const index = () => {
   return (
-    <Stack screenOptions={{headerShown:false}}/>
+    <View>
+      <Text>index</Text>
+    </View>
   )
 }
 
-export default _layout
+export default index
 
 const styles = StyleSheet.create({})
