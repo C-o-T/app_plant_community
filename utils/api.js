@@ -129,16 +129,64 @@ export const chatAPI = {
 
   // 채팅방 나가기
   leaveChatRoom: async (roomId, memId) => {
-    return await apiFetch(API_ENDPOINTS.LEAVE_CHAT_ROOM(roomId, memId), {
-      method: 'DELETE',
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.LEAVE_CHAT_ROOM(roomId, memId)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // 텍스트 응답 처리 (JSON이 아님)
+      return await response.text()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        throw new Error('요청 시간 초과')
+      }
+      throw error
+    }
   },
 
   // 읽음 처리
   markAsRead: async (roomId, memId) => {
-    return await apiFetch(API_ENDPOINTS.MARK_AS_READ(roomId, memId), {
-      method: 'PUT',
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.MARK_AS_READ(roomId, memId)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // 텍스트 응답 처리 (JSON이 아님)
+      return await response.text()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        throw new Error('요청 시간 초과')
+      }
+      throw error
+    }
   },
 
   // 안 읽은 메시지 수
