@@ -26,12 +26,13 @@ const login = () => {
       });
 
       if (res.data && res.data.memId) {
-        //로그인 성공 - 아이디, 이름, 권한, 주소 정보를 받는 객체 생성
+        //로그인 성공 - 아이디, 이름, 권한, 주소, 프로필 이미지 정보를 받는 객체 생성
         const userInfo = {
           'memId' : res.data.memId,
           'memName' : res.data.memName,
           'memGrade' : res.data.memGrade,
-          'memAddr' : res.data.memAddr || ''
+          'memAddr' : res.data.memAddr || '',
+          'profileImageUrl' : res.data.profileImageUrl || ''
         }
 
         //로그인한 유저의 정보를 secureStore에 저장
