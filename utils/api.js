@@ -1,6 +1,6 @@
 // API 기본 설정
 // Android Emulator는 10.0.2.2 사용, 실제 디바이스는 192.168.30.97 사용
-export const API_BASE_URL = 'http://192.168.30.151:5000' // 에뮬레이터용
+export const API_BASE_URL = 'http://192.168.30.97:5000' // 에뮬레이터용
 
 // API 엔드포인트
 export const API_ENDPOINTS = {
