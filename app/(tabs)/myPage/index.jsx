@@ -10,10 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '@/components/common/Button';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native'; // ✅ 올바른 출처
+import { useFocusEffect } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '@/constants/colorConstant';
-
 
 const MyPageScreen = () => {
   const router = useRouter();
@@ -27,7 +26,7 @@ const MyPageScreen = () => {
         if (info) {
           const parsedInfo = JSON.parse(info);
           if (parsedInfo.profileImageUrl) {
-            setProfileImage('http://10.0.2.2:8080' + parsedInfo.profileImageUrl);
+            setProfileImage('http://192.168.30.151:5000' + parsedInfo.profileImageUrl);
           }
         }
       };

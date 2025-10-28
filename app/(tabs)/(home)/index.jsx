@@ -30,7 +30,7 @@ const HomeScreen = () => {
     setLoading(true);
 
         try{
-          const res = await axios.get('http://192.168.30.70:8080/boards/boardList-paging', {
+          const res = await axios.get('http://192.168.30.151:5000/boards/boardList-paging', {
             params : {
               nowPage : pageNum
             }
