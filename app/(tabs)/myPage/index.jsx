@@ -1,55 +1,70 @@
-import { StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native'
-import React, { useState, useEffect } from 'react'
+import { StyleSheet, TouchableWithoutFeedback, Keyboard, View, Image, Text } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Button from '../../../components/common/Button'
-import { useRouter } from 'expo-router'
-import { Keyboard } from 'react-native'
+import { useState, useCallback } from 'react'
+import Button from '@/components/common/Button'
+import { useRouter, useFocusEffect } from 'expo-router'
 import * as SecureStore from 'expo-secure-store'
+import { colors } from '@/constants/colorConstant'
 
 const MyPageScreen = () => {
   const router = useRouter();
-  const [loginInfo, setLoginInfo] = useState(null);
+  const [profileImage, setProfileImage] = useState(null);
 
-  useEffect(() => {
-    // 로그인 정보 가져오기
-    const getLoginInfo = async () => {
-      const info = await SecureStore.getItemAsync('loginInfo');
-      if (info) {
-        setLoginInfo(JSON.parse(info));
-      }
-    };
-    getLoginInfo();
-  }, []);
+  // 페이지에 포커스될 때마다 프로필 이미지 로드
+  useFocusEffect(
+    useCallback(() => {
+      const loadProfileImage = async () => {
+        const info = await SecureStore.getItemAsync('loginInfo');
+        if (info) {
+          const parsedInfo = JSON.parse(info);
+          if (parsedInfo.profileImageUrl) {
+            setProfileImage('http://10.0.2.2:8080' + parsedInfo.profileImageUrl);
+          }
+        }
+      };
+      loadProfileImage();
+    }, [])
+  );
 
   //logout 실행시 실행할 함수
   const handleLogout = async () => {
     await SecureStore.deleteItemAsync('loginInfo');
-    setLoginInfo(null);
     router.replace('/auth/login');
   }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView>
-          <Text>전체메뉴</Text>
-            {
-              loginInfo === null 
-              ?
-              <Button 
-              title = '로그인'
-              onPress={()=>router.push('/auth/login')}
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          {/* 프로필 이미지 */}
+          <View style={styles.profileContainer}>
+            {profileImage ? (
+              <Image
+                source={{ uri: profileImage }}
+                style={styles.profileImage}
               />
-              :
-              <Button
-                title='로그아웃'
-                onPress={handleLogout}
-              />
-            }
-            
-            <Button 
-              title = '회원가입'
-              onPress={()=>router.push('/auth/join')}
+            ) : (
+              <View style={styles.placeholderImage}>
+                <Text style={styles.placeholderText}>프로필 사진</Text>
+              </View>
+            )}
+          </View>
+
+          {/* 버튼 영역 */}
+          <View style={styles.buttonContainer}>
+            <Button
+              title='프로필 변경'
+              backgroundColor={colors.MAIN}
+              onPress={() => router.push('/myPage/editProfile')}
             />
+            <Button
+              title='로그아웃'
+              backgroundColor={colors.SUB1}
+              textColor={colors.BLACK}
+              onPress={handleLogout}
+            />
+          </View>
+        </View>
       </SafeAreaView>
     </TouchableWithoutFeedback>
   )
@@ -57,4 +72,43 @@ const MyPageScreen = () => {
 
 export default MyPageScreen
 
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.WHITE
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+    alignItems: 'center',
+  },
+  profileContainer: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  profileImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 3,
+    borderColor: colors.MAIN,
+  },
+  placeholderImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: colors.SUB1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.SUB2,
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: colors.BLACK,
+    opacity: 0.5,
+  },
+  buttonContainer: {
+    width: '100%',
+  },
+})

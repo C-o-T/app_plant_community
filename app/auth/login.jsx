@@ -1,10 +1,12 @@
-import { Button, Pressable, StyleSheet, Text, TextInput, TouchableWithoutFeedback, View, Keyboard } from 'react-native'
+import { Pressable, StyleSheet, Text, TouchableWithoutFeedback, View, Keyboard } from 'react-native'
 import React, { useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import axios from 'axios'
-import { useRouter } from 'expo-router'
+import { router, useRouter } from 'expo-router'
+import Button from '@/components/common/Button'
 import Input from '@/components/common/Input.jsx'
 import * as SecureStore from 'expo-secure-store'
+import { colors } from '../../constants/colorConstant'
 
 const login = () => {
   const route = useRouter();
@@ -16,7 +18,7 @@ const login = () => {
   //로그인 함수
   const handleLogin = async () => {
     // Android Emulator는 10.0.2.2, 실제 디바이스는 192.168.30.97
-    const API_URL = 'http://10.0.2.2:5000/members/login';
+    const API_URL = 'http://10.0.2.2:8080/members/login';
 
     try {
       const res = await axios.get(API_URL, {
@@ -24,12 +26,13 @@ const login = () => {
       });
 
       if (res.data && res.data.memId) {
-        //로그인 성공 - 아이디, 이름, 권한, 주소 정보를 받는 객체 생성
+        //로그인 성공 - 아이디, 이름, 권한, 주소, 프로필 이미지 정보를 받는 객체 생성
         const userInfo = {
           'memId' : res.data.memId,
           'memName' : res.data.memName,
           'memGrade' : res.data.memGrade,
-          'memAddr' : res.data.memAddr || ''
+          'memAddr' : res.data.memAddr || '',
+          'profileImageUrl' : res.data.profileImageUrl || ''
         }
 
         //로그인한 유저의 정보를 secureStore에 저장
@@ -48,25 +51,32 @@ const login = () => {
 
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} style={styles.container}>
       <SafeAreaView>
 
-        <TextInput
+        <Input
           placeholder="아이디"
           value={loginInfo.memId}
           onChangeText={(text) => setLoginInfo({...loginInfo, memId: text})}
         />
-        <TextInput
+        <Input
           placeholder="비밀번호"
           value={loginInfo.memPw}
           onChangeText={(text) => setLoginInfo({...loginInfo, memPw: text})}
           secureTextEntry
         />
-        <Pressable
+        <Button
           onPress={handleLogin}
-        ><Text>로그인</Text></Pressable>
+          title='로그인'
+        >
+        </Button>
+        <Button
+          onPress={()=>router.push('/auth/join')}
+          title='회원가입'
+          backgroundColor={colors.SUB1}
+        >
+        </Button>
 
-        <Text>join</Text>
       </SafeAreaView>
     </TouchableWithoutFeedback>
   )
@@ -74,4 +84,9 @@ const login = () => {
 
 export default login
 
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({
+  container : {
+    flex : 1,
+    backgroundColor : colors.WHITE
+  }
+})
