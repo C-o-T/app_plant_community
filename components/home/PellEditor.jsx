@@ -34,7 +34,7 @@ const PellEditor = () => {
 
          // 3. 서버로 전송
          const response = await axios.post(
-            'http://192.168.30.97:5000/boards/upload/img',  // 업로드 엔드포인트
+            'http://192.168.30.97:8080/boards/upload/img',  // 업로드 엔드포인트
             formData, 
             {
                headers: { 
