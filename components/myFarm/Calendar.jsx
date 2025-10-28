@@ -1,24 +1,24 @@
 // components/myFarm/Calendar.jsx
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { LocaleConfig, Calendar as RNCalendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/myFarmConstant';
 import {
-    addDiary as apiAddDiary,
-    addWateringSchedule as apiAddWatering,
-    fetchDiaries,
-    fetchWateringSchedules,
+  addDiary as apiAddDiary,
+  addWateringSchedule as apiAddWatering,
+  fetchDiaries,
+  fetchWateringSchedules,
 } from '../../services/calendarService';
 
 // ✅ ESM/CJS 호환 안전 import (date-holidays)
@@ -42,7 +42,10 @@ const CalendarComponent = () => {
   const [markedDates, setMarkedDates] = useState({});
   const [events, setEvents] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [diaryModalVisible, setDiaryModalVisible] = useState(false);  // TODO: 로그인 연동 후 교체
+  const [diaryModalVisible, setDiaryModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true); // ✅ loading 상태 추가
+  
+  // TODO: 로그인 연동 후 교체
   const memId = 'user1';
 
   // 물주기 일정 입력 폼
