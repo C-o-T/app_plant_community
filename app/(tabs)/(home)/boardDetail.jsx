@@ -67,8 +67,8 @@ const BoardDetailScreen = () => {
     if (!html) return html;
     // localhost를 실제 서버 IP로 변경
     return html
-      .replace(/http:\/\/localhost:8080/g, 'http://192.168.30.97:5000')
-      .replace(/http:\/\/127.0.0.1:8080/g, 'http://192.168.30.97:5000');
+      .replace(/http:\/\/localhost:8080/g, 'http://192.168.30.97:8080')
+      .replace(/http:\/\/127.0.0.1:8080/g, 'http://192.168.30.97:8080');
   };
 
   // 게시글 상세 조회

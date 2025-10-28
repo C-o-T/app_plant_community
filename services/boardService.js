@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://192.168.30.97:5000';
+const API_BASE_URL = 'http://192.168.30.97:8080';
 
 // 이미지 업로드
 export const uploadBoardImages = async (images) => {
