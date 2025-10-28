@@ -19,14 +19,14 @@ const PellEditor = () => {
       // 1. 갤러리에서 이미지 선택
       const result = await ImagePicker.launchImageLibraryAsync({
          mediaTypes: ['images'],
-         allowsEditing: true,
+         allowsEditing: false,
          quality: 0.8,
       });
 
       if (!result.canceled) {
          // 2. FormData 생성
          const formData = new FormData();
-         formData.append('image', {
+         formData.append('img', {
             uri: result.assets[0].uri,           // 파일 경로
             type: 'image/jpeg',                  // MIME 타입
             name: 'photo.jpg',                   // 파일명
@@ -34,7 +34,7 @@ const PellEditor = () => {
 
          // 3. 서버로 전송
          const response = await axios.post(
-            'http://localhost:8080/upload',  // 업로드 엔드포인트
+            'http://192.168.30.70:8080/boards/upload/img',  // 업로드 엔드포인트
             formData, 
             {
                headers: { 
@@ -44,7 +44,8 @@ const PellEditor = () => {
          );
 
          // 4. 서버에서 받은 이미지 URL로 에디터에 삽입
-         const imageUrl = response.data.url;
+         const imageUrl = response.data[0];
+         console.log(response.data)
          richText.current?.insertImage(imageUrl);
       }
    } catch (error) {
