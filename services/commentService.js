@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://192.168.30.151:5000';
+const API_BASE_URL = 'http://192.168.30.97:5000';
 
 // 댓글 작성
 export const createComment = async (commentData) => {
