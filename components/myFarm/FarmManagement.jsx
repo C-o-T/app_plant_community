@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from '../../constants/myPageConstant';
+import { COLORS } from '../../constants/myFarmConstant';
 import { controlActuator, fetchActuatorStatus } from '../../services/actuatorService';
 import { fetchSensorData } from '../../services/sensorService';
 

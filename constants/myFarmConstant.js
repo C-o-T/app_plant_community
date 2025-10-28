@@ -29,20 +29,20 @@ export const MENU_ITEMS = [
     title: '내 농장',
     icon: '🌱',
     description: '센서 데이터 및 제어',
-    route: '/myPage/farm',
+    route: '/(home)/farm',
   },
   {
     id: 'boards',
     title: '내가 쓴 글',
     icon: '📝',
     description: '작성한 게시글 관리',
-    route: '/myPage/boards',
+    route: '/(home)/boards',
   },
   {
     id: 'calendar',
     title: '농사 캘린더',
     icon: '📅',
     description: '농사 일정 관리',
-    route: '/myPage/calendar',
+    route: '/(home)/calendar',
   },
 ];

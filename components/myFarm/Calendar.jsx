@@ -1,24 +1,24 @@
-// components/myPage/Calendar.jsx
-import React, { useEffect, useState } from 'react';
+// components/myFarm/Calendar.jsx
+import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LocaleConfig, Calendar as RNCalendar } from 'react-native-calendars';
-import { COLORS } from '../../constants/myPageConstant';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS } from '../../constants/myFarmConstant';
 import {
-  addDiary as apiAddDiary,
-  addWateringSchedule as apiAddWatering,
-  fetchDiaries,
-  fetchWateringSchedules,
+    addDiary as apiAddDiary,
+    addWateringSchedule as apiAddWatering,
+    fetchDiaries,
+    fetchWateringSchedules,
 } from '../../services/calendarService';
 
 // ✅ ESM/CJS 호환 안전 import (date-holidays)
