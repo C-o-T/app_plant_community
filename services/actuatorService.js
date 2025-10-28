@@ -1,7 +1,6 @@
 // React Native에서는 localhost 대신 PC의 실제 IP 주소 사용
-const API_BASE_URL = 'http://192.168.30.107:8080';
-// 라즈베리파이 직접 연결용 (네트워크 연결 시)
-// const API_BASE_URL = 'http://192.168.30.97:8080';
+const API_BASE_URL = 'http://192.168.30.97:5000';
+// 백엔드 서버 연결용
 
 export const controlActuator = async (raspNum, actName, command) => {
   // command가 AUTO면 AUTO 모드로, ON/OFF면 MANUAL 모드로

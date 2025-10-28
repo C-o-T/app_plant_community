@@ -1,6 +1,9 @@
-const API_BASE_URL = 'http://192.168.30.107:8080';
+// 캘린더 관련 서비스 - 실제 서버
+const API_BASE_URL = 'http://192.168.30.97:5000';
 
-// 물주기 일정 추가
+/**
+ * 물주기 일정 추가
+ */
 export const addWateringSchedule = async (memId, wateringData) => {
   const response = await fetch(`${API_BASE_URL}/watering`, {
     method: 'POST',
