@@ -1,3 +1,4 @@
+import { Keyboard, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
 import { StyleSheet, TouchableWithoutFeedback, Keyboard, View, Image, Text } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useState, useCallback } from 'react'
@@ -67,10 +68,10 @@ const MyPageScreen = () => {
         </View>
       </SafeAreaView>
     </TouchableWithoutFeedback>
-  )
-}
+  );
+};
 
-export default MyPageScreen
+export default MyPageScreen;
 
 const styles = StyleSheet.create({
   container: {

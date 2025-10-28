@@ -1,3 +1,4 @@
+import { Keyboard, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
 import { ActivityIndicator, FlatList, Keyboard, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native'
 import React, { useCallback, useEffect, useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -5,7 +6,6 @@ import Button from '../../../components/common/Button'
 import axios from 'axios'
 import { useFocusEffect } from 'expo-router'
 import Community from '../../../components/home/Community'
-
 
 const HomeScreen = () => {
   // 게시글 목록 조회하는 변수
@@ -98,9 +98,35 @@ const HomeScreen = () => {
           />
       </SafeAreaView>
     </TouchableWithoutFeedback>
-  )
-}
+  );
+};
 
-export default HomeScreen
+export default HomeScreen;
 
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+  },
+  info: {
+    fontSize: 14,
+    color: '#999',
+  },
+});
