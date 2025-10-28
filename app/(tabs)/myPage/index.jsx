@@ -1,11 +1,19 @@
-import { Keyboard, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
-import { StyleSheet, TouchableWithoutFeedback, Keyboard, View, Image, Text } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { useState, useCallback } from 'react'
-import Button from '@/components/common/Button'
-import { useRouter, useFocusEffect } from 'expo-router'
-import * as SecureStore from 'expo-secure-store'
-import { colors } from '@/constants/colorConstant'
+import React, { useCallback, useState } from 'react';
+import {
+  Keyboard,
+  StyleSheet,
+  Text,
+  TouchableWithoutFeedback,
+  View,
+  Image,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Button from '@/components/common/Button';
+import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native'; // ✅ 올바른 출처
+import * as SecureStore from 'expo-secure-store';
+import { colors } from '@/constants/colorConstant';
+
 
 const MyPageScreen = () => {
   const router = useRouter();

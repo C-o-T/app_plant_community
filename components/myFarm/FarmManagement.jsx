@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,6 +7,7 @@ import { controlActuator, fetchActuatorStatus } from '../../services/actuatorSer
 import { fetchSensorData } from '../../services/sensorService';
 
 const FarmManagement = () => {
+  const router = useRouter();
   const [sensorData, setSensorData] = useState(null);
   const [actuatorStatus, setActuatorStatus] = useState({});
   const [loading, setLoading] = useState(true);
@@ -242,11 +244,18 @@ const FarmManagement = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeaderWithButton}>
             <Text style={styles.sectionTitle}>장치 제어</Text>
-            <TouchableOpacity 
-              style={styles.resetButton}
-              onPress={resetAllToAuto}>
-              <Text style={styles.resetButtonText}>🔄 전체 AUTO</Text>
-            </TouchableOpacity>
+            <View style={styles.headerButtonGroup}>
+              <TouchableOpacity 
+                style={styles.logButton}
+                onPress={() => router.push('/myFarm/logs')}>
+                <Text style={styles.logButtonText}>📊 로그</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.resetButton}
+                onPress={resetAllToAuto}>
+                <Text style={styles.resetButtonText}>🔄 전체 AUTO</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           
           {/* PUMP 제어 */}
@@ -418,6 +427,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  headerButtonGroup: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  logButton: {
+    backgroundColor: COLORS.info,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  logButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
   },
   resetButton: {
     backgroundColor: COLORS.primary,
