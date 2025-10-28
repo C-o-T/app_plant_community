@@ -13,7 +13,7 @@ import Button from '../../../components/common/Button';
 import axios from 'axios';
 import { useFocusEffect } from '@react-navigation/native'; // ✅ expo-router ❌, 올바른 출처
 import Community from '../../../components/home/Community';
-//aa
+
 const HomeScreen = () => {
   // 게시글 목록 조회하는 변수
   const [boardList, setBoardList] = useState([]);
