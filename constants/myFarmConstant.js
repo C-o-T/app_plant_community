@@ -39,13 +39,6 @@ export const MENU_ITEMS = [
     route: '/myFarm/logs',
   },
   {
-    id: 'boards',
-    title: '내가 쓴 글',
-    icon: '📝',
-    description: '작성한 게시글 관리',
-    route: '/myFarm/boards',
-  },
-  {
     id: 'calendar',
     title: '농사 캘린더',
     icon: '📅',

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/myFarmConstant';
@@ -26,6 +26,7 @@ const ActuatorLogs = () => {
       setLoading(true);
       const actName = selectedFilter === 'ALL' ? null : selectedFilter;
       const data = await fetchActuatorLogs(raspNum, actName, 100);
+      console.log('📊 로그 데이터 샘플:', data?.slice(0, 3));
       setLogs(data || []);
     } catch (error) {
       console.error('로그 조회 실패:', error);
