@@ -12,7 +12,7 @@ const Input = ({lable='', isPw=false, ...props}) => {
       }
       <TextInput
         style={[
-          styles.input, 
+          styles.input,
           isFocus&&styles.focused
         ]}
         //focus 상태일때 실행 함수

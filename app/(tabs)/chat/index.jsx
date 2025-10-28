@@ -53,7 +53,6 @@ const ChatScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       if (currentUserId) {
-        console.log('🔄 채팅방 목록 화면 포커스 - 목록 새로고침')
         fetchChatRooms()
       }
     }, [currentUserId])
@@ -63,12 +62,8 @@ const ChatScreen = () => {
   const connectWebSocket = () => {
     webSocketService.connect(
       () => {
-        console.log('✅ 채팅방 목록 - WebSocket 연결 성공')
-
-        // 전체 메시지 구독 (모든 채팅방의 메시지를 받기 위해)
+        // 전체 메시지 구독
         webSocketService.subscribeToAllMessages((message) => {
-          console.log('📨 새 메시지 수신 (목록 화면):', message)
-
           // 해당 채팅방의 마지막 메시지 업데이트
           setChatRooms((prevRooms) => {
             return prevRooms.map((room) => {
@@ -85,7 +80,7 @@ const ChatScreen = () => {
         })
       },
       () => {
-        console.log('⚠️ 채팅방 목록 - WebSocket 연결 실패')
+        // WebSocket 연결 실패 시 조용히 처리
       }
     )
   }
@@ -94,7 +89,6 @@ const ChatScreen = () => {
     try {
       // 백엔드 API 호출
       const data = await chatAPI.getMyChatRooms(currentUserId)
-      console.log('✅ 채팅방 목록 조회 성공:', data)
 
       // 회원 정보 조회 (이름 변환용)
       let memberMap = new Map()
@@ -103,20 +97,16 @@ const ChatScreen = () => {
         members.forEach(member => {
           memberMap.set(member.memId, member.memName)
         })
-        console.log('✅ 회원 정보 로드 완료:', memberMap.size, '명')
       } catch (error) {
-        console.warn('⚠️ 회원 정보 로드 실패 - ID로 표시됩니다')
+        console.warn('회원 정보 로드 실패 - ID로 표시됩니다')
       }
 
       // 1:1 채팅방의 경우 참여자 정보에서 상대방 이름 가져오기
       const roomsWithNames = data.map((room) => {
         if (room.roomType === 'DIRECT' && !room.roomName && room.participantIds) {
-          // participantIds는 쉼표로 구분된 문자열 ("kimfarm,parkfarm")
           const participantArray = room.participantIds.split(',').map(id => id.trim())
-          // 상대방 ID 찾기 (본인 제외)
           const otherUserId = participantArray.find(id => id !== currentUserId)
           if (otherUserId) {
-            // 회원 정보에서 이름 찾기, 없으면 ID 사용
             room.roomName = memberMap.get(otherUserId) || otherUserId
           }
         }
@@ -127,32 +117,10 @@ const ChatScreen = () => {
         return room
       })
 
-      console.log('📋 처리된 채팅방 목록:', roomsWithNames)
       setChatRooms(roomsWithNames)
     } catch (error) {
       console.error('채팅방 목록 조회 실패:', error)
-      // API 실패 시 더미 데이터 표시
-      const dummyData = [
-        {
-          roomId: 1,
-          roomName: '홍길동',
-          roomType: 'DIRECT',
-          lastMessage: '안녕하세요!',
-          lastMessageAt: new Date().toISOString(),
-          unreadCount: 2,
-          participantCount: 2
-        },
-        {
-          roomId: 2,
-          roomName: '식물 애호가 모임',
-          roomType: 'GROUP',
-          lastMessage: '오늘 날씨가 좋네요',
-          lastMessageAt: new Date(Date.now() - 3600000).toISOString(),
-          unreadCount: 0,
-          participantCount: 5
-        }
-      ]
-      setChatRooms(dummyData)
+      setChatRooms([])
     } finally {
       setLoading(false)
     }
@@ -160,28 +128,15 @@ const ChatScreen = () => {
 
   // 회원 목록 불러오기
   const fetchMembers = async () => {
-    console.log('🔄 회원 목록 불러오기 시작...')
     setLoadingMembers(true)
     try {
       const data = await memberAPI.getAllMembers()
-      console.log('✅ 회원 목록 조회 성공:', data)
-      // 본인은 제외
       const filteredMembers = data.filter(member => member.memId !== currentUserId)
       setMembers(filteredMembers)
     } catch (error) {
-      console.error('❌ 회원 목록 조회 실패:', error)
-      // API 실패 시 더미 데이터 표시
-      console.log('📋 더미 회원 데이터 표시')
-      const dummyMembers = [
-        { memId: 'user456', memName: '홍길동', memEmail: 'hong@test.com' },
-        { memId: 'user789', memName: '김철수', memEmail: 'kim@test.com' },
-        { memId: 'user101', memName: '이영희', memEmail: 'lee@test.com' },
-        { memId: 'user202', memName: '박민수', memEmail: 'park@test.com' },
-      ]
-      setMembers(dummyMembers)
-      console.log('✅ 더미 회원 설정 완료:', dummyMembers.length, '명')
+      console.error('회원 목록 조회 실패:', error)
+      setMembers([])
     } finally {
-      console.log('🏁 로딩 종료 - setLoadingMembers(false)')
       setLoadingMembers(false)
     }
   }

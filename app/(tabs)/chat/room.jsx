@@ -4,8 +4,10 @@ import { Ionicons } from '@expo/vector-icons'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -18,12 +20,13 @@ import * as SecureStore from 'expo-secure-store'
 
 const ChatRoomScreen = () => {
   const { roomId, roomName } = useLocalSearchParams()
-  console.log('🏠 채팅방 입장 - roomId:', roomId, '/ roomName:', roomName)
 
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(true)
   const [wsConnected, setWsConnected] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [participants, setParticipants] = useState([])
   const flatListRef = useRef(null)
 
   // 로그인한 사용자 정보
@@ -62,6 +65,12 @@ const ChatRoomScreen = () => {
     // 기존 메시지 로드
     fetchMessages()
 
+    // 참여자 목록 로드
+    fetchParticipants()
+
+    // 채팅방 입장 시 읽음 처리
+    markMessagesAsRead()
+
     // 컴포넌트 언마운트 시 정리
     return () => {
       if (wsConnected) {
@@ -71,43 +80,74 @@ const ChatRoomScreen = () => {
     }
   }, [currentUserId, currentUserName])
 
+  // 참여자 목록 조회
+  const fetchParticipants = async () => {
+    try {
+      const data = await chatAPI.getParticipants(roomId)
+      setParticipants(data)
+    } catch (error) {
+      console.error('참여자 목록 조회 실패:', error)
+      setParticipants([])
+    }
+  }
+
+  // 읽음 처리
+  const markMessagesAsRead = async () => {
+    try {
+      await chatAPI.markAsRead(roomId, currentUserId)
+    } catch (error) {
+      console.error('읽음 처리 실패:', error.message)
+    }
+  }
+
   const connectWebSocket = () => {
     webSocketService.connect(
       () => {
-        console.log('✅ WebSocket 연결 성공 - 실시간 채팅 모드')
         setWsConnected(true)
 
         // 채팅방 구독
         webSocketService.subscribeToRoom(roomId, (message) => {
-          console.log('📨 새 메시지 수신:', message)
-          console.log('🔍 내 ID:', currentUserId, '/ 보낸 사람 ID:', message.senderId)
+          // SYSTEM 메시지 처리
+          if (message.messageType === 'SYSTEM') {
+            // 입장 메시지는 무시, 퇴장 메시지만 표시
+            if (message.content && message.content.includes('퇴장')) {
+              setMessages((prev) => {
+                if (!message.msgId || message.msgId === 0) {
+                  message.msgId = `system-${Date.now()}-${Math.random()}`
+                }
+                return [...prev, message]
+              })
+
+              // 참여자 목록 새로고침
+              fetchParticipants()
+
+              // 자동 스크롤
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true })
+              }, 100)
+            }
+            return
+          }
 
           // 받은 메시지를 목록에 추가
           setMessages((prev) => {
-            console.log('📋 현재 메시지 개수:', prev.length)
-
             // msgId가 0이거나 없으면 임시로 생성
             if (!message.msgId || message.msgId === 0) {
               message.msgId = `ws-${Date.now()}-${Math.random()}`
-              console.log('🆔 msgId 생성:', message.msgId)
             }
 
-            // 중복 방지: 같은 내용과 시간의 메시지가 있으면 추가하지 않음
+            // 중복 방지
             const isDuplicate = prev.some(m =>
               m.content === message.content &&
               m.senderId === message.senderId &&
-              Math.abs(new Date(m.sentAt) - new Date(message.sentAt)) < 1000 // 1초 이내
+              Math.abs(new Date(m.sentAt) - new Date(message.sentAt)) < 1000
             )
 
             if (isDuplicate) {
-              console.log('⚠️ 중복 메시지 무시:', message.content)
               return prev
             }
 
-            console.log('✅ 메시지 추가됨:', message.content)
-            const newMessages = [...prev, message]
-            console.log('📋 새 메시지 개수:', newMessages.length)
-            return newMessages
+            return [...prev, message]
           })
 
           // 자동 스크롤
@@ -119,45 +159,24 @@ const ChatRoomScreen = () => {
         // 채팅방 입장 알림
         webSocketService.joinRoom(roomId, currentUserId, currentUserName)
       },
-      (error) => {
-        console.log('⚠️ WebSocket 연결 실패 - 더미 모드로 작동')
-        console.log('서버가 실행되지 않았거나 네트워크 오류일 수 있습니다')
+      () => {
         setWsConnected(false)
-        // Alert 제거 - 더미 모드로 조용히 작동
       }
     )
   }
 
   const fetchMessages = async () => {
     try {
-      // 백엔드 API로 기존 메시지 조회
       const data = await chatAPI.getMessages(roomId)
       setMessages(data)
+
+      // 메시지 로드 후 최하단으로 스크롤
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false })
+      }, 100)
     } catch (error) {
       console.error('메시지 조회 실패:', error)
-
-      // API 실패 시 더미 데이터 표시 (개발용)
-      const dummyMessages = [
-        {
-          msgId: 1,
-          roomId: parseInt(roomId),
-          senderId: 'user456',
-          senderName: '홍길동',
-          content: '안녕하세요!',
-          sentAt: new Date(Date.now() - 3600000).toISOString(),
-          messageType: 'TEXT',
-        },
-        {
-          msgId: 2,
-          roomId: parseInt(roomId),
-          senderId: currentUserId,
-          senderName: currentUserName,
-          content: '안녕하세요. 반갑습니다!',
-          sentAt: new Date(Date.now() - 3000000).toISOString(),
-          messageType: 'TEXT',
-        },
-      ]
-      setMessages(dummyMessages)
+      setMessages([])
     } finally {
       setLoading(false)
     }
@@ -167,7 +186,7 @@ const ChatRoomScreen = () => {
     if (!inputText.trim()) return
 
     const messageContent = inputText.trim()
-    setInputText('') // 입력창 바로 비우기
+    setInputText('')
 
     const newMessage = {
       roomId: parseInt(roomId),
@@ -178,14 +197,11 @@ const ChatRoomScreen = () => {
     }
 
     try {
-      // 1. DB에 메시지 저장 (API 호출)
-      console.log('💾 DB에 메시지 저장 중...')
+      // 1. DB에 메시지 저장
       const savedMessage = await chatAPI.sendMessage(newMessage)
-      console.log('✅ DB에 메시지 저장 완료:', savedMessage)
 
       // 2. WebSocket으로 실시간 전송
       if (wsConnected) {
-        console.log('📡 WebSocket으로 실시간 전송')
         webSocketService.sendMessage(
           roomId,
           currentUserId,
@@ -194,8 +210,7 @@ const ChatRoomScreen = () => {
           'TEXT'
         )
       } else {
-        // WebSocket 연결 안 되어 있으면 로컬에 바로 추가 (더미 모드)
-        console.log('더미 모드: 로컬에만 메시지 추가')
+        // WebSocket 연결 안 되어 있으면 로컬에 바로 추가
         setMessages((prev) => [...prev, {
           ...savedMessage,
           msgId: savedMessage.msgId || Date.now(),
@@ -203,13 +218,13 @@ const ChatRoomScreen = () => {
         }])
       }
 
-      // 메시지 전송 후 스크롤 하단으로 이동
+      // 자동 스크롤
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true })
       }, 100)
     } catch (error) {
-      console.error('❌ 메시지 전송 실패:', error)
-      // 실패해도 로컬에는 추가 (임시)
+      console.error('메시지 전송 실패:', error)
+      // 실패해도 로컬에는 추가
       setMessages((prev) => [...prev, {
         ...newMessage,
         msgId: `temp-${Date.now()}`,
@@ -223,7 +238,52 @@ const ChatRoomScreen = () => {
     return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
   }
 
+  // 채팅방 나가기
+  const handleLeaveChatRoom = () => {
+    Alert.alert(
+      '채팅방 나가기',
+      '정말 채팅방을 나가시겠습니까?',
+      [
+        {
+          text: '취소',
+          style: 'cancel',
+        },
+        {
+          text: '나가기',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // 1. WebSocket으로 퇴장 알림 전송
+              if (wsConnected) {
+                webSocketService.leaveRoom(roomId, currentUserId, currentUserName)
+                webSocketService.unsubscribeFromRoom(roomId)
+              }
+
+              // 2. 백엔드 API로 채팅방 나가기
+              await chatAPI.leaveChatRoom(roomId, currentUserId)
+
+              // 3. 채팅방 목록으로 이동
+              router.back()
+            } catch (error) {
+              console.error('채팅방 나가기 실패:', error)
+              Alert.alert('오류', '채팅방 나가기에 실패했습니다.')
+            }
+          },
+        },
+      ]
+    )
+  }
+
   const renderMessage = ({ item, index }) => {
+    // SYSTEM 메시지인 경우 (퇴장 메시지)
+    if (item.messageType === 'SYSTEM') {
+      return (
+        <View style={styles.systemMessageContainer}>
+          <Text style={styles.systemMessageText}>{item.content}</Text>
+        </View>
+      )
+    }
+
     const isMyMessage = item.senderId === currentUserId
     const showTime =
       index === messages.length - 1 ||
@@ -292,10 +352,61 @@ const ChatRoomScreen = () => {
             </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.menuButton}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => setShowMenu(true)}>
           <Ionicons name="menu" size={24} color="#000" />
         </TouchableOpacity>
       </View>
+
+      {/* 메뉴 모달 */}
+      <Modal
+        visible={showMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={styles.menuContainer}>
+            {/* 참여자 목록 */}
+            <View style={styles.participantsSection}>
+              <Text style={styles.participantsTitle}>
+                참여자 ({participants.length}명)
+              </Text>
+              {participants.map((participant, index) => (
+                <View key={participant.memId || index} style={styles.participantItem}>
+                  <View style={styles.participantAvatar}>
+                    <Text style={styles.participantAvatarText}>
+                      {participant.memName ? participant.memName.charAt(0) : '?'}
+                    </Text>
+                  </View>
+                  <Text style={styles.participantName}>
+                    {participant.memName || participant.memId}
+                    {participant.memId === currentUserId && ' (나)'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* 구분선 */}
+            <View style={styles.menuDivider} />
+
+            {/* 나가기 버튼 */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false)
+                handleLeaveChatRoom()
+              }}
+            >
+              <Ionicons name="exit-outline" size={22} color="#FF6B6B" />
+              <Text style={styles.menuItemText}>채팅방 나가기</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <KeyboardAvoidingView
         style={styles.content}
@@ -318,10 +429,6 @@ const ChatRoomScreen = () => {
         )}
 
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.addButton}>
-            <Ionicons name="add-circle-outline" size={28} color="#666" />
-          </TouchableOpacity>
-
           <TextInput
             style={styles.input}
             value={inputText}
@@ -410,6 +517,18 @@ const styles = StyleSheet.create({
   otherMessageContainer: {
     alignItems: 'flex-start',
   },
+  systemMessageContainer: {
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  systemMessageText: {
+    fontSize: 12,
+    color: '#999',
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
   messageHeader: {
     marginBottom: 4,
   },
@@ -456,15 +575,11 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',
-  },
-  addButton: {
-    padding: 6,
-    marginRight: 4,
   },
   input: {
     flex: 1,
@@ -486,5 +601,79 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // 메뉴 모달 스타일
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+  },
+  menuContainer: {
+    backgroundColor: '#fff',
+    marginTop: 60,
+    marginRight: 16,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    minWidth: 220,
+    maxWidth: 280,
+  },
+  participantsSection: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    maxHeight: 300,
+  },
+  participantsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 12,
+  },
+  participantItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 10,
+  },
+  participantAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFE08C',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  participantAvatarText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  participantName: {
+    fontSize: 15,
+    color: '#333',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginVertical: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: '#FF6B6B',
+    fontWeight: '500',
   },
 })
