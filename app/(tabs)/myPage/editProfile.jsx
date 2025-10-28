@@ -24,7 +24,7 @@ const EditProfile = () => {
         // 기존 프로필 이미지가 있으면 표시
         if (parsedInfo.profileImageUrl) {
 
-          setProfileImage('http://192.168.30.97:5000' + parsedInfo.profileImageUrl);
+          setProfileImage('http://192.168.30.97:8080' + parsedInfo.profileImageUrl);
         }
       }
     };
@@ -78,7 +78,7 @@ const EditProfile = () => {
       // 서버에 업로드
       const response = await axios.post(
 
-        'http://192.168.30.97:5000/members/profile-image',
+        'http://192.168.30.97:8080/members/profile-image',
 
         formData,
         {

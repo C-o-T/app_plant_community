@@ -89,21 +89,21 @@ const Join = () => {
     const config = {
       memId: {
         value: joinData.memId,
-        url: `http://192.168.30.151:5000/members/checkId/${joinData.memId}`,
+        url: `http://192.168.30.97:8080/members/checkId/${joinData.memId}`,
         emptyMsg: '아이디를 입력하세요.',
         successMsg: '사용 가능한 아이디입니다.',
         failMsg: '이 아이디는 사용할 수 없습니다.'
       },
       memTell: {
         value: joinData.memTell,
-        url: `http://192.168.30.151:5000/members/checkTell/${joinData.memTell}`,
+        url: `http://192.168.30.97:8080/members/checkTell/${joinData.memTell}`,
         emptyMsg: '연락처를 입력하세요.',
         successMsg: '사용 가능한 연락처입니다.',
         failMsg: '이 연락처는 사용할 수 없습니다.'
       },
       memBusinessNum: {
         value: joinData.memBusinessNum,
-        url: `http://192.168.30.151:5000/members/checkBusinessNum/${joinData.memBusinessNum}`,
+        url: `http://192.168.30.97:8080/members/checkBusinessNum/${joinData.memBusinessNum}`,
         emptyMsg: '사업자등록번호를 입력하세요.',
         successMsg: '회원 가입 가능한 사업자번호입니다.',
         failMsg: '중복된 사업자 번호입니다.'
@@ -161,7 +161,7 @@ const Join = () => {
     }
 
     try {
-      await axios.post('http://192.168.30.151:5000/members', joinData);
+      await axios.post('http://192.168.30.97:8080/members', joinData);
       Alert.alert('환영합니다', '회원가입이 완료되었습니다.', [
         { text: '확인', onPress: () => router.replace('/auth/login') }
       ]);

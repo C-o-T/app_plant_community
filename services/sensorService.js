@@ -1,7 +1,9 @@
 // React Native에서는 localhost 대신 PC의 실제 IP 주소 사용
+
 // const API_BASE_URL = 'http://192.168.30.107:8080';
 // 라즈베리파이 직접 연결용 (네트워크 연결 시)
 const API_BASE_URL = 'http://192.168.30.97:8080';
+
 
 /**
  * 센서 데이터 조회

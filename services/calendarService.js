@@ -1,6 +1,10 @@
+
 const API_BASE_URL = 'http://192.168.30.97:8080';
 
-// 물주기 일정 추가
+
+/**
+ * 물주기 일정 추가
+ */
 export const addWateringSchedule = async (memId, wateringData) => {
   try {
     const response = await fetch(`${API_BASE_URL}/watering`, {
