@@ -80,7 +80,7 @@ const FarmManagement = () => {
   const handleActuatorControl = async (actName, command) => {
     try {
       console.log(`🎮 제어 시도: ${actName} - ${command}`);
-      console.log(`📡 API URL: http://192.168.30.107:8080/control/control`);
+      console.log(`📡 API URL: http://192.168.30.97:8080/control/control`);
       console.log(`📦 요청 데이터:`, { raspNum, actName, command });
       
       if (command === 'AUTO') {

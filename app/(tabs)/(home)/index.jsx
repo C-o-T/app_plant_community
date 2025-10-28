@@ -103,7 +103,6 @@ const HomeScreen = () => {
   const handleWritePost = () => {
     router.push('/write');
   };
-  console.log(boardList)
   return (
     <SafeAreaView style={styles.container}>
       {/* 검색 영역 */}
