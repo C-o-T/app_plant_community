@@ -26,7 +26,9 @@ const MyPageScreen = () => {
         if (info) {
           const parsedInfo = JSON.parse(info);
           if (parsedInfo.profileImageUrl) {
-            setProfileImage('http://192.168.30.151:5000' + parsedInfo.profileImageUrl);
+
+            setProfileImage('http://192.168.30.97:5000' + parsedInfo.profileImageUrl);
+
           }
         }
       };
@@ -36,7 +38,9 @@ const MyPageScreen = () => {
 
   //logout 실행시 실행할 함수
   const handleLogout = async () => {
+    console.log('로그아웃 실행');
     await SecureStore.deleteItemAsync('loginInfo');
+    console.log('SecureStore 삭제 완료');
     router.replace('/auth/login');
   }
 
