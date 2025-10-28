@@ -18,7 +18,7 @@ const login = () => {
   //로그인 함수
   const handleLogin = async () => {
     // Android Emulator는 10.0.2.2, 실제 디바이스는 192.168.30.97
-    const API_URL = 'http://192.168.30.151:5000/members/login';
+    const API_URL = 'http://192.168.30.97:5000/members/login';
 
     try {
       const res = await axios.get(API_URL, {
