@@ -32,11 +32,11 @@ export const MENU_ITEMS = [
     route: '/myFarm/farm',
   },
   {
-    id: 'boards',
-    title: '내가 쓴 글',
-    icon: '📝',
-    description: '작성한 게시글 관리',
-    route: '/myFarm/boards',
+    id: 'logs',
+    title: '기기 상호작용 로그',
+    icon: '📊',
+    description: '제어 기록 및 히스토리',
+    route: '/myFarm/logs',
   },
   {
     id: 'calendar',

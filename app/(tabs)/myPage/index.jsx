@@ -26,7 +26,9 @@ const MyPageScreen = () => {
         if (info) {
           const parsedInfo = JSON.parse(info);
           if (parsedInfo.profileImageUrl) {
+
             setProfileImage('http://192.168.30.97:5000' + parsedInfo.profileImageUrl);
+
           }
         }
       };

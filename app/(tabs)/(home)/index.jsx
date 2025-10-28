@@ -1,73 +1,85 @@
-import React, { useCallback, useEffect, useState } from 'react';
+
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Keyboard,
   StyleSheet,
   Text,
-  TouchableWithoutFeedback,
+  TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Button from '../../../components/common/Button';
-import axios from 'axios';
-import { useFocusEffect } from '@react-navigation/native'; // ✅ expo-router ❌, 올바른 출처
+import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { fetchBoardList } from '../../../services/boardService';
 import Community from '../../../components/home/Community';
 
 const HomeScreen = () => {
-  // 게시글 목록 조회하는 변수
+  const router = useRouter();
   const [boardList, setBoardList] = useState([]);
-  const [page, setPage] = useState(1);           // 현재 페이지
-  const [loading, setLoading] = useState(false);        // 로딩 중
-  const [hasMore, setHasMore] = useState(true);         // 더 있는지
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [searchType, setSearchType] = useState('title');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [tempKeyword, setTempKeyword] = useState('');
 
-  //게시글 조회 함수 
-  const getBoardList = async(pageNum) => {
-    // 이미 로딩 중이거나 더 이상 없으면 중단
-    if (loading || !hasMore) return;
+  // 게시글 조회 함수
+  const getBoardList = async (pageNum, isNewSearch = false) => {
+    if (loading || (!hasMore && !isNewSearch)) return;
 
     setLoading(true);
+    try {
+      const response = await fetchBoardList({
+        pageNo: pageNum,
+        searchType: searchType,
+        searchKeyword: searchKeyword,
+      });
 
-        try{
-          const res = await axios.get('http://192.168.30.70:8080/boards/boardList-paging', {
-            params : {
-              nowPage : pageNum
-            }
-          });
+      const newBoards = response.boardList;
 
-          const newBoards = res.data.boardList;
+      if (!newBoards || newBoards.length === 0) {
+        setHasMore(false);
+        if (isNewSearch) setBoardList([]);
+        return;
+      }
 
-           // 데이터가 없거나 적으면 마지막 페이지
-          if (!newBoards || newBoards.length === 0) {
-            setHasMore(false);
-            return;
-          }
-          setBoardList((prev) => [...prev, ...newBoards]);
+      if (isNewSearch) {
+        setBoardList(newBoards);
+      } else {
+        setBoardList((prev) => [...prev, ...newBoards]);
+      }
 
-          setPage(pageNum + 1)
+      setPage(pageNum + 1);
 
-          if(newBoards.length < 10){
-            setHasMore(false);
-          }
+      if (newBoards.length < 10) {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('게시글 조회 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        }catch(error){
-          console.log(error)
-        } finally {
-          setLoading(false);
-        }
-      };
-
-  // 마운트시 게시글 목록 조회
+  // 화면 포커스 시 초기화 및 조회
   useFocusEffect(
     useCallback(() => {
-      
       setBoardList([]);
       setPage(1);
       setHasMore(true);
-
-      getBoardList(1);
-    },[])
+      getBoardList(1, true);
+    }, [searchKeyword])
   );
+
+  // 검색 실행
+  const handleSearch = () => {
+    setSearchKeyword(tempKeyword);
+    setBoardList([]);
+    setPage(1);
+    setHasMore(true);
+  };
 
   // 스크롤 끝에 도달 시 실행
   const handleLoadMore = () => {
@@ -87,24 +99,97 @@ const HomeScreen = () => {
     );
   };
 
-  // 데이터 확인 
+  // 글쓰기 버튼 핸들러
+  const handleWritePost = () => {
+    router.push('/write');
+  };
   console.log(boardList)
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView>
-          <FlatList 
-            data = {boardList}
-            renderItem = {({item}) => <Community item = {item}/>}
-            keyExtractor = {item => item.boardNum}
+    <SafeAreaView style={styles.container}>
+      {/* 검색 영역 */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchTypeContainer}>
+          <TouchableOpacity
+            style={[
+              styles.searchTypeButton,
+              searchType === 'title' && styles.searchTypeButtonActive,
+            ]}
+            onPress={() => setSearchType('title')}
+          >
+            <Text
+              style={[
+                styles.searchTypeText,
+                searchType === 'title' && styles.searchTypeTextActive,
+              ]}
+            >
+              제목
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.searchTypeButton,
+              searchType === 'content' && styles.searchTypeButtonActive,
+            ]}
+            onPress={() => setSearchType('content')}
+          >
+            <Text
+              style={[
+                styles.searchTypeText,
+                searchType === 'content' && styles.searchTypeTextActive,
+              ]}
+            >
+              내용
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.searchTypeButton,
+              searchType === 'memId' && styles.searchTypeButtonActive,
+            ]}
+            onPress={() => setSearchType('memId')}
+          >
+            <Text
+              style={[
+                styles.searchTypeText,
+                searchType === 'memId' && styles.searchTypeTextActive,
+              ]}
+            >
+              작성자
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-             // ⭐ 무한 스크롤 전용 Props
-            onEndReached={handleLoadMore}        // 스크롤 끝에 도달 시 실행
-            onEndReachedThreshold={0}          // 언제 실행할지 (0.5 = 50% 남았을 때)
-            ListFooterComponent={renderFooter}   // 로딩 인디케이터 표시
-            maxToRenderPerBatch={10}
+        <View style={styles.searchInputContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="검색어를 입력하세요"
+            value={tempKeyword}
+            onChangeText={setTempKeyword}
+            onSubmitEditing={handleSearch}
           />
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+          <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+            <Text style={styles.searchButtonText}>검색</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 게시글 목록 */}
+      <FlatList
+        data={boardList}
+        renderItem={({ item }) => <Community item={item} />}
+        keyExtractor={(item) => item.boardNum.toString()}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
+        maxToRenderPerBatch={10}
+        contentContainerStyle={styles.listContent}
+      />
+
+      {/* 글쓰기 버튼 */}
+      <TouchableOpacity style={styles.writeButton} onPress={handleWritePost}>
+        <Text style={styles.writeButtonText}>+</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 };
 
@@ -115,25 +200,82 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-  content: {
+  searchContainer: {
+    backgroundColor: '#FFF',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  searchTypeContainer: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    gap: 10,
+  },
+  searchTypeButton: {
     flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+  },
+  searchTypeButtonActive: {
+    backgroundColor: '#4CAF50',
+  },
+  searchTypeText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  searchTypeTextActive: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    backgroundColor: '#FFF',
+  },
+  searchButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#4CAF50',
+    borderRadius: 20,
+    justifyContent: 'center',
+  },
+  searchButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  listContent: {
+    paddingBottom: 80,
+  },
+  writeButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  title: {
-    fontSize: 28,
+  writeButtonText: {
+    fontSize: 30,
+    color: '#FFF',
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-  },
-  info: {
-    fontSize: 14,
-    color: '#999',
   },
 });
