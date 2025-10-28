@@ -1,11 +1,18 @@
-import { Keyboard, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
-import { ActivityIndicator, FlatList, Keyboard, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native'
-import React, { useCallback, useEffect, useState } from 'react'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import Button from '../../../components/common/Button'
-import axios from 'axios'
-import { useFocusEffect } from 'expo-router'
-import Community from '../../../components/home/Community'
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Keyboard,
+  StyleSheet,
+  Text,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Button from '../../../components/common/Button';
+import axios from 'axios';
+import { useFocusEffect } from '@react-navigation/native'; // ✅ expo-router ❌, 올바른 출처
+import Community from '../../../components/home/Community';
 
 const HomeScreen = () => {
   // 게시글 목록 조회하는 변수
@@ -22,7 +29,7 @@ const HomeScreen = () => {
     setLoading(true);
 
         try{
-          const res = await axios.get('http://192.168.30.70:8080/boards/boardList-paging', {
+          const res = await axios.get('http://192.168.30.151:5000/boards/boardList-paging', {
             params : {
               nowPage : pageNum
             }
