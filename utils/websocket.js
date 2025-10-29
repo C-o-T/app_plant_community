@@ -11,6 +11,22 @@ class WebSocketService {
 
   // WebSocket 연결
   connect(onConnected, onError) {
+    // 이미 연결 중이거나 연결되어 있으면 무시
+    if (this.client && (this.connected || this.client.active)) {
+      console.log('WebSocket이 이미 연결되어 있습니다')
+      if (onConnected) onConnected()
+      return
+    }
+
+    // 기존 클라이언트가 있으면 정리
+    if (this.client) {
+      try {
+        this.client.deactivate()
+      } catch (e) {
+        console.warn('기존 클라이언트 정리 중 에러:', e)
+      }
+    }
+
     // SockJS를 사용한 STOMP 클라이언트 생성
     this.client = new Client({
       webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws-chat`),
@@ -23,6 +39,7 @@ class WebSocketService {
       heartbeatOutgoing: 4000,
 
       onConnect: () => {
+        console.log('✅ WebSocket 연결 성공')
         this.connected = true
         if (onConnected) onConnected()
       },
@@ -40,6 +57,7 @@ class WebSocketService {
       },
 
       onDisconnect: () => {
+        console.log('WebSocket 연결 해제')
         this.connected = false
       },
     })
