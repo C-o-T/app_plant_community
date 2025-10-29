@@ -17,8 +17,10 @@ import { COLORS } from '../../constants/myFarmConstant';
 import {
   addDiary as apiAddDiary,
   addWateringSchedule as apiAddWatering,
+  deleteDiary,
+  deleteWateringSchedule,
   fetchDiaries,
-  fetchWateringSchedules,
+  fetchWateringSchedules
 } from '../../services/calendarService';
 
 // ✅ ESM/CJS 호환 안전 import (date-holidays)
@@ -254,6 +256,57 @@ const CalendarComponent = () => {
     }
   };
 
+  
+  // 물주기 일정 삭제
+  const handleDeleteWatering = async (wateringId) => {
+    Alert.alert(
+      '삭제 확인',
+      '이 물주기 일정을 삭제하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteWateringSchedule(wateringId);
+              Alert.alert('성공', '물주기 일정이 삭제되었습니다.');
+              await loadAllData(); // 목록 새로고침
+            } catch (error) {
+              console.error('물주기 일정 삭제 실패:', error);
+              Alert.alert('오류', '삭제에 실패했습니다.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // 일기 삭제
+  const handleDeleteDiary = async (diaryId) => {
+    Alert.alert(
+      '삭제 확인',
+      '이 일기를 삭제하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDiary(diaryId);
+              Alert.alert('성공', '일기가 삭제되었습니다.');
+              await loadAllData(); // 목록 새로고침
+            } catch (error) {
+              console.error('일기 삭제 실패:', error);
+              Alert.alert('오류', '삭제에 실패했습니다.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // 특정 날짜 이벤트
   const getEventsForDate = (date) => events.filter((event) => event.date === date);
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
@@ -418,19 +471,34 @@ const CalendarComponent = () => {
                       { borderLeftColor: event.type === 'watering' ? COLORS.primary : '#FFD700' },
                     ]}
                   >
-                    {event.type === 'watering' ? (
-                      <>
-                        <Text style={styles.eventType}>💧 물주기</Text>
-                        <Text style={styles.eventContent}>{event.plantName}</Text>
-                        <Text style={styles.eventDetail}>주기: {event.cycle}일</Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.eventType}>📝 일기</Text>
-                        <Text style={styles.eventContent}>{event.title}</Text>
-                        <Text style={styles.eventDetail}>날씨: {event.weather ?? '맑음'}</Text>
-                      </>
-                    )}
+                    <View style={styles.eventCardContent}>
+                      <View style={styles.eventInfo}>
+                        {event.type === 'watering' ? (
+                          <>
+                            <Text style={styles.eventType}>💧 물주기</Text>
+                            <Text style={styles.eventContent}>{event.plantName}</Text>
+                            <Text style={styles.eventDetail}>주기: {event.cycle}일</Text>
+                          </>
+                        ) : (
+                          <>
+                            <Text style={styles.eventType}>📝 일기</Text>
+                            <Text style={styles.eventContent}>{event.title}</Text>
+                            <Text style={styles.eventDetail}>날씨: {event.weather ?? '맑음'}</Text>
+                          </>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => 
+                          event.type === 'watering' 
+                            ? handleDeleteWatering(event.id) 
+                            : handleDeleteDiary(event.id)
+                        }
+                      >
+                        <Text style={styles.deleteButtonText}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                    
                   </View>
                 ))}
               </View>
@@ -631,6 +699,21 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     borderLeftWidth: 4,
+  },
+    eventCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  eventInfo: {
+    flex: 1,
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  deleteButtonText: {
+    fontSize: 20,
   },
   eventType: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 4 },
   eventContent: { fontSize: 16, color: COLORS.text, marginBottom: 2 },
