@@ -48,7 +48,12 @@ const HomeScreen = () => {
       if (isNewSearch) {
         setBoardList(newBoards);
       } else {
-        setBoardList((prev) => [...prev, ...newBoards]);
+        // 중복 제거: 이미 존재하는 boardNum은 제외
+        setBoardList((prev) => {
+          const existingIds = new Set(prev.map(board => board.boardNum));
+          const uniqueNewBoards = newBoards.filter(board => !existingIds.has(board.boardNum));
+          return [...prev, ...uniqueNewBoards];
+        });
       }
 
       setPage(pageNum + 1);
