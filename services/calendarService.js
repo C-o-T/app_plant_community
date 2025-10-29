@@ -46,8 +46,15 @@ export const addWateringSchedule = async (memId, wateringData) => {
       }
     }
     
-    return JSON.parse(text);
-  } catch (error) {
+    // 성공 시 JSON 파싱 시도, 실패하면 성공 메시지 반환
+    try {
+      return JSON.parse(text);
+    } catch (parseError) {
+      // JSON이 아닌 텍스트 응답이면 성공으로 처리
+      console.log('물주기 일정 추가 성공 (텍스트 응답):', text);
+      return { success: true, message: text };
+    }
+  } catch (error)   {
     console.error('물주기 일정 추가 에러:', error);
     throw error;
   }
@@ -65,8 +72,19 @@ export const deleteWateringSchedule = async (wateringId) => {
   const response = await fetch(`${API_BASE_URL}/watering/${wateringId}`, {
     method: 'DELETE',
   });
+  
+  const text = await response.text();
+  console.log('물주기 일정 삭제 응답:', response.status, text);
+  
   if (!response.ok) throw new Error('물주기 일정 삭제 실패');
-  return await response.json();
+  
+  // JSON 파싱 시도, 실패하면 성공 메시지 반환
+  try {
+    return JSON.parse(text);
+  } catch (parseError) {
+    console.log('물주기 일정 삭제 성공 (텍스트 응답):', text);
+    return { success: true, message: text };
+  }
 };
 
 // 일기 작성
@@ -126,8 +144,14 @@ export const addDiary = async (memId, diaryData) => {
       }
     }
     
-    // 성공 시 JSON 파싱
-    return JSON.parse(text);
+    // 성공 시 JSON 파싱 시도, 실패하면 성공 메시지 반환
+    try {
+      return JSON.parse(text);
+    } catch (parseError) {
+      // JSON이 아닌 텍스트 응답이면 성공으로 처리
+      console.log('일기 작성 성공 (텍스트 응답):', text);
+      return { success: true, message: text };
+    }
   } catch (error) {
     console.error('일기 작성 에러:', error);
     throw error;
@@ -146,6 +170,17 @@ export const deleteDiary = async (diaryId) => {
   const response = await fetch(`${API_BASE_URL}/diaries/${diaryId}`, {
     method: 'DELETE',
   });
+  
+  const text = await response.text();
+  console.log('일기 삭제 응답:', response.status, text);
+  
   if (!response.ok) throw new Error('일기 삭제 실패');
-  return await response.json();
+  
+  // JSON 파싱 시도, 실패하면 성공 메시지 반환
+  try {
+    return JSON.parse(text);
+  } catch (parseError) {
+    console.log('일기 삭제 성공 (텍스트 응답):', text);
+    return { success: true, message: text };
+  }
 };
