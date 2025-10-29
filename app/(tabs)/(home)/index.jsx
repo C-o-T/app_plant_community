@@ -2,6 +2,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -41,7 +42,21 @@ const HomeScreen = () => {
 
       if (!newBoards || newBoards.length === 0) {
         setHasMore(false);
-        if (isNewSearch) setBoardList([]);
+        if (isNewSearch) {
+          setBoardList([]);
+          // 검색어가 있을 때만 알람 표시
+          if (searchKeyword && searchKeyword.trim() !== '') {
+            let message = '';
+            if (searchType === 'title') {
+              message = '제목에 일치하는 내용이 없습니다.';
+            } else if (searchType === 'titleAndContent') {
+              message = '내용에 일치하는 내용이 없습니다.';
+            } else if (searchType === 'memId') {
+              message = '작성자에 일치하는 내용이 없습니다.';
+            }
+            Alert.alert('검색 결과 없음', message);
+          }
+        }
         return;
       }
 
@@ -63,6 +78,12 @@ const HomeScreen = () => {
       }
     } catch (error) {
       console.error('게시글 조회 실패:', error);
+      console.error('Error details:', error.message);
+      Alert.alert('오류', `게시글을 불러오는데 실패했습니다.\n${error.message}`);
+      setHasMore(false);
+      if (isNewSearch) {
+        setBoardList([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -132,14 +153,14 @@ const HomeScreen = () => {
           <TouchableOpacity
             style={[
               styles.searchTypeButton,
-              searchType === 'content' && styles.searchTypeButtonActive,
+              searchType === 'titleAndContent' && styles.searchTypeButtonActive,
             ]}
-            onPress={() => setSearchType('content')}
+            onPress={() => setSearchType('titleAndContent')}
           >
             <Text
               style={[
                 styles.searchTypeText,
-                searchType === 'content' && styles.searchTypeTextActive,
+                searchType === 'titleAndContent' && styles.searchTypeTextActive,
               ]}
             >
               내용
