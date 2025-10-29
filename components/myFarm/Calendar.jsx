@@ -15,12 +15,14 @@ import { LocaleConfig, Calendar as RNCalendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/myFarmConstant';
 import {
-    addDiary as apiAddDiary,
-    addWateringSchedule as apiAddWatering,
-    deleteDiary,
-    deleteWateringSchedule,
-    fetchDiaries,
-    fetchWateringSchedules
+
+  addDiary as apiAddDiary,
+  addWateringSchedule as apiAddWatering,
+  deleteDiary,
+  deleteWateringSchedule,
+  fetchDiaries,
+  fetchWateringSchedules
+
 } from '../../services/calendarService';
 
 // ✅ ESM/CJS 호환 안전 import (date-holidays)
@@ -255,6 +257,7 @@ const CalendarComponent = () => {
       Alert.alert('오류', '일기 작성에 실패했습니다.');
     }
   };
+
 
   // 물주기 일정 삭제
   const handleDeleteWatering = async (wateringId) => {
@@ -497,6 +500,7 @@ const CalendarComponent = () => {
                         <Text style={styles.deleteButtonText}>🗑️</Text>
                       </TouchableOpacity>
                     </View>
+
                   </View>
                 ))}
               </View>
@@ -698,7 +702,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderLeftWidth: 4,
   },
-  eventCardContent: {
+    eventCardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',

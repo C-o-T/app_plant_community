@@ -45,7 +45,7 @@ export const addWateringSchedule = async (memId, wateringData) => {
         throw new Error(errorMsg);
       }
     }
-    
+
     // 성공 시 JSON 파싱 시도, 실패하면 성공 메시지 반환
     try {
       return JSON.parse(text);
@@ -72,7 +72,7 @@ export const deleteWateringSchedule = async (wateringId) => {
   const response = await fetch(`${API_BASE_URL}/watering/${wateringId}`, {
     method: 'DELETE',
   });
-  
+
   const text = await response.text();
   console.log('물주기 일정 삭제 응답:', response.status, text);
   
