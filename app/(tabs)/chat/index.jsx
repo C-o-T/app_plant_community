@@ -43,37 +43,23 @@ const ChatScreen = () => {
     loadUserInfo()
   }, [])
 
-  useEffect(() => {
-    if (currentUserId) {
-      fetchChatRooms()
-      connectWebSocket()
-    }
-
-    // 컴포넌트 언마운트 시 WebSocket 구독 해제
-    return () => {
-      if (currentUserId) {
-        webSocketService.unsubscribeFromAllMessages()
-      }
-    }
-  }, [currentUserId])
-
-  // 화면 포커스 시 채팅방 목록 새로고침 및 WebSocket 재연결
+  // 화면 포커스 시 채팅방 목록 새로고침 및 WebSocket 연결
   useFocusEffect(
     React.useCallback(() => {
-      if (currentUserId) {
-        console.log('채팅 화면 포커스 - 목록 새로고침')
-        fetchChatRooms()
+      if (!currentUserId) return
 
-        // WebSocket 재연결 (끊어졌을 경우)
-        if (!webSocketService.isConnected()) {
-          console.log('WebSocket 재연결 시도')
-          connectWebSocket()
-        }
-      }
+      console.log('📱 채팅 화면 포커스')
 
-      // 화면에서 벗어날 때는 아무것도 하지 않음 (WebSocket 유지)
+      // 채팅방 목록 로드
+      fetchChatRooms()
+
+      // WebSocket 연결 (중복 방지 로직은 websocket.js에 있음)
+      connectWebSocket()
+
+      // 화면에서 벗어날 때 구독만 해제 (연결은 유지)
       return () => {
-        console.log('채팅 화면 포커스 해제')
+        console.log('📱 채팅 화면 포커스 해제 - 구독 해제')
+        webSocketService.unsubscribeFromAllMessages()
       }
     }, [currentUserId])
   )
@@ -82,10 +68,16 @@ const ChatScreen = () => {
   const connectWebSocket = () => {
     webSocketService.connect(
       () => {
-        console.log('WebSocket 연결 성공 - 전체 메시지 구독 시작')
+        // 이미 구독 중이면 다시 구독하지 않음
+        if (webSocketService.subscriptions.has('all-messages')) {
+          console.log('이미 전체 메시지 구독 중')
+          return
+        }
+
+        console.log('📡 전체 메시지 구독 시작')
         // 전체 메시지 구독
         webSocketService.subscribeToAllMessages((message) => {
-          console.log('새 메시지 수신:', message)
+          console.log('💬 새 메시지 수신:', message)
 
           // 해당 채팅방의 마지막 메시지 업데이트 및 맨 위로 이동
           setChatRooms((prevRooms) => {
@@ -156,33 +148,56 @@ const ChatScreen = () => {
 
       // 채팅방 이름 및 프로필 이미지 설정
       const roomsWithNames = data.map((room) => {
-        if (!room.participantIds) return room
+        console.log(`🔍 채팅방 ${room.roomId} 처리:`, {
+          roomType: room.roomType,
+          roomName: room.roomName,
+          participantIds: room.participantIds
+        })
+
+        if (!room.participantIds) {
+          console.warn(`⚠️ 채팅방 ${room.roomId}에 participantIds가 없습니다`)
+          return room
+        }
 
         const participantArray = room.participantIds.split(',').map(id => id.trim())
         const otherUserIds = participantArray.filter(id => id !== currentUserId)
 
-        // 1:1 채팅방
-        if (room.roomType === 'DIRECT' && otherUserIds.length === 1) {
+        // 실제로는 DIRECT지만 3명 이상이면 단체방으로 처리 (백엔드 동기화 문제 대응)
+        const isActuallyGroup = otherUserIds.length >= 2
+
+        // 1:1 채팅방 (상대방 1명)
+        if (!isActuallyGroup && otherUserIds.length === 1) {
           const otherUserId = otherUserIds[0]
           const memberInfo = memberMap.get(otherUserId)
           room.roomName = memberInfo?.name || otherUserId
           room.profileImageUrl = memberInfo?.profileImageUrl
           room.otherUserId = otherUserId
         }
-        // 단체 채팅방
-        else if (room.roomType === 'GROUP') {
-          // roomName이 없으면 참여자 이름으로 동적 생성
-          if (!room.roomName) {
+        // 단체 채팅방 (상대방 2명 이상 또는 roomType이 GROUP)
+        else if (isActuallyGroup || room.roomType === 'GROUP') {
+          // roomName이 없거나 "단체 채팅방"이면 참여자 이름으로 동적 생성
+          if (!room.roomName || room.roomName === '단체 채팅방') {
             const participantNames = otherUserIds
-              .map(id => memberMap.get(id)?.name || id)
+              .map(id => {
+                const memberInfo = memberMap.get(id)
+                return memberInfo?.name || id
+              })
               .filter(name => name)
 
-            if (participantNames.length <= 3) {
-              // 3명 이하: 모든 이름 표시
+            console.log(`🏷️ 채팅방 ${room.roomId} 이름 생성:`, {
+              otherUserIds,
+              participantNames,
+              memberMapSize: memberMap.size
+            })
+
+            if (participantNames.length === 0) {
+              room.roomName = '단체 채팅방'
+            } else if (participantNames.length <= 4) {
+              // 4명 이하: 모든 이름 표시
               room.roomName = participantNames.join(', ')
             } else {
-              // 4명 이상: "이름1, 이름2 외 n명"
-              room.roomName = `${participantNames.slice(0, 2).join(', ')} 외 ${participantNames.length - 2}명`
+              // 5명 이상: "이름1, 이름2 외 n명"
+              room.roomName = `${participantNames.slice(0, 1).join(', ')} 외 ${participantNames.length - 1}명`
             }
           }
 

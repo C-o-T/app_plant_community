@@ -15,7 +15,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator
+  ActivityIndicator,
+  Linking
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as SecureStore from 'expo-secure-store'
@@ -37,6 +38,7 @@ const ChatRoomScreen = () => {
   const [selectedMembers, setSelectedMembers] = useState([])
   const [uploadingFile, setUploadingFile] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [viewingImage, setViewingImage] = useState(null) // 전체화면 이미지
   const flatListRef = useRef(null)
 
   // 로그인한 사용자 정보
@@ -519,8 +521,8 @@ const ChatRoomScreen = () => {
         return (
           <TouchableOpacity
             onPress={() => {
-              // 이미지 전체화면으로 보기 (나중에 구현 가능)
-              Alert.alert('이미지', item.content)
+              // 이미지 전체화면으로 보기
+              setViewingImage(`http://192.168.30.97:8080${item.fileUrl}`)
             }}
           >
             <Image
@@ -528,14 +530,6 @@ const ChatRoomScreen = () => {
               style={styles.messageImage}
               resizeMode="cover"
             />
-            {item.content && (
-              <Text style={[
-                styles.messageText,
-                isMyMessage ? styles.myMessageText : styles.otherMessageText,
-              ]}>
-                {item.content}
-              </Text>
-            )}
           </TouchableOpacity>
         )
       } else if (item.messageType === 'FILE' && item.fileUrl) {
@@ -543,7 +537,35 @@ const ChatRoomScreen = () => {
           <TouchableOpacity
             style={styles.fileMessageContainer}
             onPress={() => {
-              Alert.alert('파일', `파일: ${item.content}`)
+              // 파일 다운로드/열기
+              const fileUrl = `http://192.168.30.97:8080${item.fileUrl}`
+              Alert.alert(
+                '파일',
+                item.content,
+                [
+                  {
+                    text: '취소',
+                    style: 'cancel'
+                  },
+                  {
+                    text: '열기',
+                    onPress: async () => {
+                      // React Native Linking API로 파일 열기
+                      try {
+                        const supported = await Linking.canOpenURL(fileUrl)
+                        if (supported) {
+                          await Linking.openURL(fileUrl)
+                        } else {
+                          Alert.alert('오류', '파일을 열 수 없습니다')
+                        }
+                      } catch (error) {
+                        console.error('파일 열기 실패:', error)
+                        Alert.alert('오류', '파일을 여는 중 오류가 발생했습니다')
+                      }
+                    }
+                  }
+                ]
+              )
             }}
           >
             <Ionicons name="document-attach" size={24} color={isMyMessage ? "#000" : "#666"} />
@@ -939,6 +961,30 @@ const ChatRoomScreen = () => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* 이미지 전체화면 뷰어 */}
+      <Modal
+        visible={!!viewingImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setViewingImage(null)}
+      >
+        <View style={styles.imageViewerContainer}>
+          <TouchableOpacity
+            style={styles.imageViewerClose}
+            onPress={() => setViewingImage(null)}
+          >
+            <Ionicons name="close" size={32} color="#fff" />
+          </TouchableOpacity>
+          {viewingImage && (
+            <Image
+              source={{ uri: viewingImage }}
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -1382,5 +1428,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  // 이미지 전체화면 뷰어
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 10,
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
   },
 })
