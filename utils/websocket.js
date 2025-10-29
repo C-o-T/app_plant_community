@@ -160,7 +160,7 @@ class WebSocketService {
   }
 
   // 메시지 전송
-  sendMessage(roomId, userId, userName, content, messageType = 'TEXT') {
+  sendMessage(roomId, userId, userName, content, messageType = 'TEXT', fileUrl = null) {
     if (!this.connected || !this.client) {
       console.error('WebSocket이 연결되지 않았습니다')
       return
@@ -172,6 +172,11 @@ class WebSocketService {
       senderName: userName,
       content: content,
       messageType: messageType,
+    }
+
+    // fileUrl이 있으면 추가
+    if (fileUrl) {
+      message.fileUrl = fileUrl
     }
 
     this.client.publish({
