@@ -47,13 +47,32 @@ const ChatScreen = () => {
       fetchChatRooms()
       connectWebSocket()
     }
+
+    // 컴포넌트 언마운트 시 WebSocket 구독 해제
+    return () => {
+      if (currentUserId) {
+        webSocketService.unsubscribeFromAllMessages()
+      }
+    }
   }, [currentUserId])
 
-  // 화면 포커스 시 채팅방 목록 새로고침
+  // 화면 포커스 시 채팅방 목록 새로고침 및 WebSocket 재연결
   useFocusEffect(
     React.useCallback(() => {
       if (currentUserId) {
+        console.log('채팅 화면 포커스 - 목록 새로고침')
         fetchChatRooms()
+
+        // WebSocket 재연결 (끊어졌을 경우)
+        if (!webSocketService.isConnected()) {
+          console.log('WebSocket 재연결 시도')
+          connectWebSocket()
+        }
+      }
+
+      // 화면에서 벗어날 때는 아무것도 하지 않음 (WebSocket 유지)
+      return () => {
+        console.log('채팅 화면 포커스 해제')
       }
     }, [currentUserId])
   )
@@ -66,14 +85,20 @@ const ChatScreen = () => {
         // 전체 메시지 구독
         webSocketService.subscribeToAllMessages((message) => {
           console.log('새 메시지 수신:', message)
+
           // 해당 채팅방의 마지막 메시지 업데이트 및 맨 위로 이동
           setChatRooms((prevRooms) => {
             const updatedRooms = prevRooms.map((room) => {
               if (room.roomId === message.roomId) {
+                // 내가 보낸 메시지가 아니면 unreadCount 증가
+                const isMyMessage = message.senderId === currentUserId
+                const newUnreadCount = isMyMessage ? room.unreadCount || 0 : (room.unreadCount || 0) + 1
+
                 return {
                   ...room,
                   lastMessage: message.content,
                   lastMessageAt: message.sentAt || new Date().toISOString(),
+                  unreadCount: newUnreadCount,
                 }
               }
               return room
@@ -96,21 +121,21 @@ const ChatScreen = () => {
 
   const fetchChatRooms = async () => {
     try {
+      console.log(`📋 채팅방 목록 조회 시작 (사용자: ${currentUserId})`)
       // 백엔드 API 호출
       const data = await chatAPI.getMyChatRooms(currentUserId)
+      console.log(`📋 조회된 채팅방 수: ${data.length}`, data)
 
       // 회원 정보 조회 (이름 및 프로필 이미지)
       let memberMap = new Map()
       try {
         const members = await memberAPI.getAllMembers()
-        console.log('채팅방 목록 - 전체 회원 정보:', JSON.stringify(members, null, 2))
         members.forEach(member => {
           memberMap.set(member.memId, {
             name: member.memName,
             profileImageUrl: member.profileImageUrl
           })
         })
-        console.log('채팅방 목록 - memberMap:', Array.from(memberMap.entries()))
       } catch (error) {
         console.warn('회원 정보 로드 실패 - ID로 표시됩니다')
       }
@@ -141,9 +166,11 @@ const ChatScreen = () => {
         return new Date(b.lastMessageAt) - new Date(a.lastMessageAt)
       })
 
-      setChatRooms(sortedRooms)
+      console.log(`✅ 채팅방 목록 업데이트 완료: ${sortedRooms.length}개`)
+      // 배열을 완전히 새로 만들어서 리렌더링 강제
+      setChatRooms([...sortedRooms])
     } catch (error) {
-      console.error('채팅방 목록 조회 실패:', error)
+      console.error('❌ 채팅방 목록 조회 실패:', error)
       setChatRooms([])
     } finally {
       setLoading(false)
@@ -199,8 +226,10 @@ const ChatScreen = () => {
       setSelectedUsers([])
       setGroupName('')
 
-      // 채팅방 목록 새로고침
-      await fetchChatRooms()
+      // 채팅방 목록 새로고침 (약간의 딜레이 후)
+      setTimeout(async () => {
+        await fetchChatRooms()
+      }, 300)
 
       // 새로 만든 채팅방으로 이동
       const selectedUserName = members.find(u => u.memId === selectedUsers[0])?.memName || '채팅방'
@@ -244,13 +273,24 @@ const ChatScreen = () => {
     return (
       <TouchableOpacity
         style={styles.chatRoomItem}
-        onPress={() => router.push({
-          pathname: '/chat/room',
-          params: {
-            roomId: item.roomId,
-            roomName: displayName
-          }
-        })}
+        onPress={() => {
+          // 채팅방 입장 시 unreadCount를 0으로 초기화
+          setChatRooms((prevRooms) =>
+            prevRooms.map((room) =>
+              room.roomId === item.roomId
+                ? { ...room, unreadCount: 0 }
+                : room
+            )
+          )
+
+          router.push({
+            pathname: '/chat/room',
+            params: {
+              roomId: item.roomId,
+              roomName: displayName
+            }
+          })
+        }}
       >
         <View style={styles.profileImageContainer}>
           {profileImageUrl ? (
@@ -326,6 +366,8 @@ const ChatScreen = () => {
           renderItem={renderChatRoom}
           keyExtractor={(item) => item.roomId.toString()}
           contentContainerStyle={styles.listContent}
+          extraData={chatRooms}
+          removeClippedSubviews={false}
         />
       )}
 
@@ -386,17 +428,28 @@ const ChatScreen = () => {
               keyExtractor={(item) => item.memId}
               renderItem={({ item }) => {
                 const isSelected = selectedUsers.includes(item.memId)
+                const userProfileUrl = item.profileImageUrl
+                  ? `http://192.168.30.97:8080${item.profileImageUrl}`
+                  : null
+
                 return (
                   <TouchableOpacity
                     style={styles.userItem}
                     onPress={() => toggleUserSelection(item.memId)}
                   >
                     <View style={styles.userInfo}>
-                      <View style={styles.userAvatar}>
-                        <Text style={styles.userAvatarText}>
-                          {item.memName.charAt(0)}
-                        </Text>
-                      </View>
+                      {userProfileUrl ? (
+                        <Image
+                          source={{ uri: userProfileUrl }}
+                          style={styles.userAvatar}
+                        />
+                      ) : (
+                        <View style={styles.userAvatar}>
+                          <Text style={styles.userAvatarText}>
+                            {item.memName.charAt(0)}
+                          </Text>
+                        </View>
+                      )}
                       <View>
                         <Text style={styles.userName}>{item.memName}</Text>
                         {item.memEmail && (
@@ -598,6 +651,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   userAvatarText: {
     fontSize: 16,
