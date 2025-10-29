@@ -2,6 +2,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -41,14 +42,22 @@ const HomeScreen = () => {
 
       if (!newBoards || newBoards.length === 0) {
         setHasMore(false);
-        if (isNewSearch) setBoardList([]);
+        if (isNewSearch) {
+          setBoardList([]);
+          // 알람 제거 - 빈 리스트로 ListEmptyComponent가 표시됨
+        }
         return;
       }
 
       if (isNewSearch) {
         setBoardList(newBoards);
       } else {
-        setBoardList((prev) => [...prev, ...newBoards]);
+        // 중복 제거: 이미 존재하는 boardNum은 제외
+        setBoardList((prev) => {
+          const existingIds = new Set(prev.map(board => board.boardNum));
+          const uniqueNewBoards = newBoards.filter(board => !existingIds.has(board.boardNum));
+          return [...prev, ...uniqueNewBoards];
+        });
       }
 
       setPage(pageNum + 1);
@@ -58,6 +67,12 @@ const HomeScreen = () => {
       }
     } catch (error) {
       console.error('게시글 조회 실패:', error);
+      console.error('Error details:', error.message);
+      Alert.alert('오류', `게시글을 불러오는데 실패했습니다.\n${error.message}`);
+      setHasMore(false);
+      if (isNewSearch) {
+        setBoardList([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -127,14 +142,14 @@ const HomeScreen = () => {
           <TouchableOpacity
             style={[
               styles.searchTypeButton,
-              searchType === 'content' && styles.searchTypeButtonActive,
+              searchType === 'titleAndContent' && styles.searchTypeButtonActive,
             ]}
-            onPress={() => setSearchType('content')}
+            onPress={() => setSearchType('titleAndContent')}
           >
             <Text
               style={[
                 styles.searchTypeText,
-                searchType === 'content' && styles.searchTypeTextActive,
+                searchType === 'titleAndContent' && styles.searchTypeTextActive,
               ]}
             >
               내용
@@ -180,6 +195,17 @@ const HomeScreen = () => {
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
+        ListEmptyComponent={
+          !loading && (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {searchKeyword && searchKeyword.trim() !== ''
+                  ? '검색된 결과가 없습니다.'
+                  : '등록된 글이 없습니다.'}
+              </Text>
+            </View>
+          )
+        }
         maxToRenderPerBatch={10}
         contentContainerStyle={styles.listContent}
       />
@@ -255,6 +281,16 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 80,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
   },
   writeButton: {
     position: 'absolute',

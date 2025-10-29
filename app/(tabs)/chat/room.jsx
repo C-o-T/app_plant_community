@@ -1,4 +1,4 @@
-import { chatAPI } from '@/utils/api'
+import { chatAPI, memberAPI } from '@/utils/api'
 import webSocketService from '@/utils/websocket'
 import { Ionicons } from '@expo/vector-icons'
 import { router, useLocalSearchParams } from 'expo-router'
@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,10 +14,14 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  ActivityIndicator,
+  Linking
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as SecureStore from 'expo-secure-store'
+import * as ImagePicker from 'expo-image-picker'
+import * as DocumentPicker from 'expo-document-picker'
 
 const ChatRoomScreen = () => {
   const { roomId, roomName } = useLocalSearchParams()
@@ -27,6 +32,13 @@ const ChatRoomScreen = () => {
   const [wsConnected, setWsConnected] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [participants, setParticipants] = useState([])
+  const [participantProfiles, setParticipantProfiles] = useState({}) // senderId -> profileImageUrl 매핑
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false)
+  const [allMembers, setAllMembers] = useState([])
+  const [selectedMembers, setSelectedMembers] = useState([])
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [viewingImage, setViewingImage] = useState(null) // 전체화면 이미지
   const flatListRef = useRef(null)
 
   // 로그인한 사용자 정보
@@ -85,6 +97,22 @@ const ChatRoomScreen = () => {
     try {
       const data = await chatAPI.getParticipants(roomId)
       setParticipants(data)
+
+      // 전체 회원 정보 조회해서 프로필 이미지 매핑
+      const profileMap = {}
+      try {
+        const members = await memberAPI.getAllMembers()
+        members.forEach(member => {
+          if (member.profileImageUrl) {
+            profileMap[member.memId] = member.profileImageUrl
+          }
+        })
+        console.log('프로필 맵:', profileMap)
+      } catch (error) {
+        console.warn('회원 정보 로드 실패')
+      }
+
+      setParticipantProfiles(profileMap)
     } catch (error) {
       console.error('참여자 목록 조회 실패:', error)
       setParticipants([])
@@ -170,15 +198,154 @@ const ChatRoomScreen = () => {
       const data = await chatAPI.getMessages(roomId)
       setMessages(data)
 
-      // 메시지 로드 후 최하단으로 스크롤
+      // 메시지 로드 후 최하단으로 스크롤 (여러 번 시도)
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: false })
       }, 100)
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false })
+      }, 300)
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false })
+      }, 500)
     } catch (error) {
       console.error('메시지 조회 실패:', error)
       setMessages([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 이미지 선택
+  const pickImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+      if (permissionResult.granted === false) {
+        Alert.alert('권한 필요', '갤러리 접근 권한이 필요합니다')
+        return
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      })
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedFile({
+          uri: result.assets[0].uri,
+          type: 'image',
+          name: result.assets[0].fileName || `image_${Date.now()}.jpg`,
+          mimeType: 'image/jpeg'
+        })
+      }
+    } catch (error) {
+      console.error('이미지 선택 실패:', error)
+      Alert.alert('오류', '이미지 선택에 실패했습니다')
+    }
+  }
+
+  // 파일 선택
+  const pickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      })
+
+      if (!result.canceled && result.assets[0]) {
+        const file = result.assets[0]
+        setSelectedFile({
+          uri: file.uri,
+          type: 'file',
+          name: file.name,
+          mimeType: file.mimeType,
+          size: file.size
+        })
+      }
+    } catch (error) {
+      console.error('파일 선택 실패:', error)
+      Alert.alert('오류', '파일 선택에 실패했습니다')
+    }
+  }
+
+  // 파일 업로드 및 메시지 전송
+  const sendFileMessage = async () => {
+    if (!selectedFile) return
+
+    setUploadingFile(true)
+
+    try {
+      // FormData 생성
+      const formData = new FormData()
+      formData.append('file', {
+        uri: selectedFile.uri,
+        type: selectedFile.mimeType,
+        name: selectedFile.name,
+      })
+      formData.append('roomId', roomId)
+      formData.append('senderId', currentUserId)
+
+      // 파일 업로드
+      const response = await fetch('http://192.168.30.97:8080/api/chat/upload', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('파일 업로드 실패')
+      }
+
+      const data = await response.json()
+
+      // 메시지 전송
+      const newMessage = {
+        roomId: parseInt(roomId),
+        senderId: currentUserId,
+        senderName: currentUserName,
+        content: selectedFile.name,
+        messageType: selectedFile.type === 'image' ? 'IMAGE' : 'FILE',
+        fileUrl: data.fileUrl,
+      }
+
+      // DB에 메시지 저장
+      const savedMessage = await chatAPI.sendMessage(newMessage)
+
+      // WebSocket으로 실시간 전송
+      if (wsConnected) {
+        webSocketService.sendMessage(
+          roomId,
+          currentUserId,
+          currentUserName,
+          selectedFile.name,
+          newMessage.messageType,
+          data.fileUrl
+        )
+      } else {
+        setMessages((prev) => [...prev, {
+          ...savedMessage,
+          msgId: savedMessage.msgId || Date.now(),
+          sentAt: savedMessage.sentAt || new Date().toISOString(),
+        }])
+      }
+
+      // 선택된 파일 초기화
+      setSelectedFile(null)
+
+      // 자동 스크롤
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true })
+      }, 100)
+    } catch (error) {
+      console.error('파일 전송 실패:', error)
+      Alert.alert('오류', '파일 전송에 실패했습니다')
+    } finally {
+      setUploadingFile(false)
     }
   }
 
@@ -238,6 +405,58 @@ const ChatRoomScreen = () => {
     return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
   }
 
+  // 전체 회원 목록 가져오기 (초대용)
+  const fetchAllMembersForInvite = async () => {
+    try {
+      const members = await memberAPI.getAllMembers()
+
+      // 이미 참여 중인 회원 제외
+      const participantIds = participants.map(p => p.memId)
+      const availableMembers = members.filter(
+        member => !participantIds.includes(member.memId)
+      )
+
+      setAllMembers(availableMembers)
+    } catch (error) {
+      console.error('회원 목록 조회 실패:', error)
+      setAllMembers([])
+    }
+  }
+
+  // 회원 선택 토글
+  const toggleMemberSelection = (memId) => {
+    setSelectedMembers(prev =>
+      prev.includes(memId)
+        ? prev.filter(id => id !== memId)
+        : [...prev, memId]
+    )
+  }
+
+  // 대화상대 추가
+  const handleAddMembers = async () => {
+    if (selectedMembers.length === 0) {
+      Alert.alert('알림', '추가할 회원을 선택해주세요')
+      return
+    }
+
+    try {
+      // 선택된 회원들을 채팅방에 추가
+      for (const memId of selectedMembers) {
+        await chatAPI.addParticipant(roomId, memId)
+      }
+
+      Alert.alert('성공', '대화상대가 추가되었습니다')
+      setShowAddMemberModal(false)
+      setSelectedMembers([])
+
+      // 참여자 목록 새로고침
+      await fetchParticipants()
+    } catch (error) {
+      console.error('대화상대 추가 실패:', error)
+      Alert.alert('오류', '대화상대 추가에 실패했습니다')
+    }
+  }
+
   // 채팅방 나가기
   const handleLeaveChatRoom = () => {
     Alert.alert(
@@ -290,43 +509,150 @@ const ChatRoomScreen = () => {
       messages[index + 1].senderId !== item.senderId ||
       new Date(messages[index + 1].sentAt) - new Date(item.sentAt) > 60000
 
-    return (
-      <View
-        style={[
-          styles.messageContainer,
-          isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer,
-        ]}
-      >
-        {!isMyMessage && (
-          <View style={styles.messageHeader}>
-            <Text style={styles.senderName}>{item.senderName}</Text>
-          </View>
-        )}
+    // 프로필 이미지 URL (다른 사용자의 메시지인 경우에만)
+    const senderProfileImageUrl = !isMyMessage && participantProfiles[item.senderId]
+    const otherUserProfileUrl = senderProfileImageUrl
+      ? `http://192.168.30.97:8080${senderProfileImageUrl}`
+      : null
 
-        <View style={styles.messageRow}>
-          {isMyMessage && showTime && (
-            <Text style={styles.messageTime}>{formatTime(item.sentAt)}</Text>
-          )}
-
-          <View
-            style={[
-              styles.messageBubble,
-              isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble,
-            ]}
+    // 메시지 내용 렌더링
+    const renderMessageContent = () => {
+      if (item.messageType === 'IMAGE' && item.fileUrl) {
+        return (
+          <TouchableOpacity
+            onPress={() => {
+              // 이미지 전체화면으로 보기
+              setViewingImage(`http://192.168.30.97:8080${item.fileUrl}`)
+            }}
           >
-            <Text
-              style={[
-                styles.messageText,
-                isMyMessage ? styles.myMessageText : styles.otherMessageText,
-              ]}
-            >
+            <Image
+              source={{ uri: `http://192.168.30.97:8080${item.fileUrl}` }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+        )
+      } else if (item.messageType === 'FILE' && item.fileUrl) {
+        return (
+          <TouchableOpacity
+            style={styles.fileMessageContainer}
+            onPress={() => {
+              // 파일 다운로드/열기
+              const fileUrl = `http://192.168.30.97:8080${item.fileUrl}`
+              Alert.alert(
+                '파일',
+                item.content,
+                [
+                  {
+                    text: '취소',
+                    style: 'cancel'
+                  },
+                  {
+                    text: '열기',
+                    onPress: async () => {
+                      // React Native Linking API로 파일 열기
+                      try {
+                        const supported = await Linking.canOpenURL(fileUrl)
+                        if (supported) {
+                          await Linking.openURL(fileUrl)
+                        } else {
+                          Alert.alert('오류', '파일을 열 수 없습니다')
+                        }
+                      } catch (error) {
+                        console.error('파일 열기 실패:', error)
+                        Alert.alert('오류', '파일을 여는 중 오류가 발생했습니다')
+                      }
+                    }
+                  }
+                ]
+              )
+            }}
+          >
+            <Ionicons name="document-attach" size={24} color={isMyMessage ? "#000" : "#666"} />
+            <Text style={[
+              styles.messageText,
+              isMyMessage ? styles.myMessageText : styles.otherMessageText,
+            ]}>
               {item.content}
             </Text>
+          </TouchableOpacity>
+        )
+      } else {
+        return (
+          <Text
+            style={[
+              styles.messageText,
+              isMyMessage ? styles.myMessageText : styles.otherMessageText,
+            ]}
+          >
+            {item.content}
+          </Text>
+        )
+      }
+    }
+
+    if (isMyMessage) {
+      // 내 메시지
+      return (
+        <View style={[styles.messageContainer, styles.myMessageContainer]}>
+          <View style={styles.bubbleRow}>
+            {showTime && (
+              <Text style={styles.messageTime}>{formatTime(item.sentAt)}</Text>
+            )}
+            <View
+              style={[
+                styles.messageBubble,
+                styles.myMessageBubble,
+                item.messageType === 'IMAGE' && styles.imageMessageBubble,
+              ]}
+            >
+              {renderMessageContent()}
+            </View>
+          </View>
+        </View>
+      )
+    }
+
+    // 상대방 메시지
+    return (
+      <View style={[styles.messageContainer, styles.otherMessageContainer]}>
+        <View style={styles.messageRow}>
+          {/* 프로필 이미지 */}
+          <View style={styles.profileImageContainer}>
+            {otherUserProfileUrl ? (
+              <Image
+                source={{ uri: otherUserProfileUrl }}
+                style={styles.messageProfileImage}
+              />
+            ) : (
+              <View style={styles.messageProfilePlaceholder}>
+                <Text style={styles.messageProfileText}>
+                  {item.senderName ? item.senderName.charAt(0) : '?'}
+                </Text>
+              </View>
+            )}
           </View>
 
-          {!isMyMessage && showTime && (
-            <Text style={styles.messageTime}>{formatTime(item.sentAt)}</Text>
-          )}
+          <View style={styles.messageContentContainer}>
+            {/* 사용자 이름 */}
+            <Text style={styles.senderName}>{item.senderName}</Text>
+
+            <View style={styles.bubbleRow}>
+              <View
+                style={[
+                  styles.messageBubble,
+                  styles.otherMessageBubble,
+                  item.messageType === 'IMAGE' && styles.imageMessageBubble,
+                ]}
+              >
+                {renderMessageContent()}
+              </View>
+
+              {showTime && (
+                <Text style={styles.messageTime}>{formatTime(item.sentAt)}</Text>
+              )}
+            </View>
+          </View>
         </View>
       </View>
     )
@@ -375,20 +701,57 @@ const ChatRoomScreen = () => {
               <Text style={styles.participantsTitle}>
                 참여자 ({participants.length}명)
               </Text>
-              {participants.map((participant, index) => (
-                <View key={participant.memId || index} style={styles.participantItem}>
-                  <View style={styles.participantAvatar}>
-                    <Text style={styles.participantAvatarText}>
-                      {participant.memName ? participant.memName.charAt(0) : '?'}
-                    </Text>
-                  </View>
-                  <Text style={styles.participantName}>
-                    {participant.memName || participant.memId}
-                    {participant.memId === currentUserId && ' (나)'}
-                  </Text>
-                </View>
-              ))}
+              <FlatList
+                data={participants}
+                keyExtractor={(item, index) => item.memId || index.toString()}
+                renderItem={({ item: participant }) => {
+                  // participantProfiles에서 프로필 이미지 가져오기
+                  const profileImageUrl = participantProfiles[participant.memId]
+                  const participantProfileUrl = profileImageUrl
+                    ? `http://192.168.30.97:8080${profileImageUrl}`
+                    : null
+
+                  return (
+                    <View style={styles.participantItem}>
+                      {participantProfileUrl ? (
+                        <Image
+                          source={{ uri: participantProfileUrl }}
+                          style={styles.participantAvatar}
+                        />
+                      ) : (
+                        <View style={styles.participantAvatar}>
+                          <Text style={styles.participantAvatarText}>
+                            {participant.memName ? participant.memName.charAt(0) : '?'}
+                          </Text>
+                        </View>
+                      )}
+                      <Text style={styles.participantName}>
+                        {participant.memName || participant.memId}
+                        {participant.memId === currentUserId && ' (나)'}
+                      </Text>
+                    </View>
+                  )
+                }}
+                style={styles.participantsList}
+                nestedScrollEnabled
+              />
             </View>
+
+            {/* 구분선 */}
+            <View style={styles.menuDivider} />
+
+            {/* 대화상대 추가하기 버튼 */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false)
+                fetchAllMembersForInvite()
+                setShowAddMemberModal(true)
+              }}
+            >
+              <Ionicons name="person-add-outline" size={22} color="#4CAF50" />
+              <Text style={[styles.menuItemText, { color: '#4CAF50' }]}>대화상대 추가하기</Text>
+            </TouchableOpacity>
 
             {/* 구분선 */}
             <View style={styles.menuDivider} />
@@ -408,6 +771,96 @@ const ChatRoomScreen = () => {
         </TouchableOpacity>
       </Modal>
 
+      {/* 대화상대 추가 모달 */}
+      <Modal
+        visible={showAddMemberModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddMemberModal(false)}
+      >
+        <View style={styles.addMemberModalOverlay}>
+          <View style={styles.addMemberModalContainer}>
+            <View style={styles.addMemberHeader}>
+              <Text style={styles.addMemberTitle}>대화상대 추가하기</Text>
+              <TouchableOpacity onPress={() => setShowAddMemberModal(false)}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={allMembers}
+              keyExtractor={(item) => item.memId}
+              renderItem={({ item }) => {
+                const isSelected = selectedMembers.includes(item.memId)
+                const memberProfileUrl = participantProfiles[item.memId]
+                  ? `http://192.168.30.97:8080${participantProfiles[item.memId]}`
+                  : null
+
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.memberSelectItem,
+                      isSelected && styles.memberSelectItemSelected
+                    ]}
+                    onPress={() => toggleMemberSelection(item.memId)}
+                  >
+                    {memberProfileUrl ? (
+                      <Image
+                        source={{ uri: memberProfileUrl }}
+                        style={styles.memberSelectAvatar}
+                      />
+                    ) : (
+                      <View style={styles.memberSelectAvatar}>
+                        <Text style={styles.memberSelectAvatarText}>
+                          {item.memName ? item.memName.charAt(0) : '?'}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.memberSelectInfo}>
+                      <Text style={styles.memberSelectName}>{item.memName}</Text>
+                      <Text style={styles.memberSelectId}>{item.memId}</Text>
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                    )}
+                  </TouchableOpacity>
+                )
+              }}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>추가 가능한 회원이 없습니다</Text>
+                </View>
+              }
+              style={styles.memberList}
+            />
+
+            <View style={styles.addMemberFooter}>
+              <TouchableOpacity
+                style={styles.addMemberCancelButton}
+                onPress={() => {
+                  setShowAddMemberModal(false)
+                  setSelectedMembers([])
+                }}
+              >
+                <Text style={styles.addMemberCancelButtonText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.addMemberConfirmButton,
+                  selectedMembers.length === 0 && styles.addMemberConfirmButtonDisabled
+                ]}
+                onPress={handleAddMembers}
+                disabled={selectedMembers.length === 0}
+              >
+                <Text style={styles.addMemberConfirmButtonText}>
+                  추가 ({selectedMembers.length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <KeyboardAvoidingView
         style={styles.content}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -425,10 +878,67 @@ const ChatRoomScreen = () => {
             keyExtractor={(item) => item.msgId.toString()}
             contentContainerStyle={styles.messagesList}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+            }}
           />
         )}
 
+        {/* 선택된 파일 미리보기 */}
+        {selectedFile && (
+          <View style={styles.filePreviewContainer}>
+            {selectedFile.type === 'image' ? (
+              <Image
+                source={{ uri: selectedFile.uri }}
+                style={styles.filePreviewImage}
+              />
+            ) : (
+              <View style={styles.filePreviewFile}>
+                <Ionicons name="document-attach" size={32} color="#666" />
+                <Text style={styles.filePreviewText} numberOfLines={1}>
+                  {selectedFile.name}
+                </Text>
+              </View>
+            )}
+            <View style={styles.filePreviewActions}>
+              <TouchableOpacity
+                style={styles.filePreviewButton}
+                onPress={() => setSelectedFile(null)}
+              >
+                <Ionicons name="close-circle" size={24} color="#FF6B6B" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filePreviewButton, styles.filePreviewSendButton]}
+                onPress={sendFileMessage}
+                disabled={uploadingFile}
+              >
+                {uploadingFile ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={24} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={styles.inputContainer}>
+          {/* 파일 첨부 버튼들 */}
+          <TouchableOpacity
+            style={styles.attachButton}
+            onPress={pickImage}
+          >
+            <Ionicons name="image-outline" size={24} color="#666" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.attachButton}
+            onPress={pickFile}
+          >
+            <Ionicons name="attach-outline" size={24} color="#666" />
+          </TouchableOpacity>
+
           <TextInput
             style={styles.input}
             value={inputText}
@@ -451,6 +961,30 @@ const ChatRoomScreen = () => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* 이미지 전체화면 뷰어 */}
+      <Modal
+        visible={!!viewingImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setViewingImage(null)}
+      >
+        <View style={styles.imageViewerContainer}>
+          <TouchableOpacity
+            style={styles.imageViewerClose}
+            onPress={() => setViewingImage(null)}
+          >
+            <Ionicons name="close" size={32} color="#fff" />
+          </TouchableOpacity>
+          {viewingImage && (
+            <Image
+              source={{ uri: viewingImage }}
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -509,7 +1043,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   messageContainer: {
-    marginBottom: 12,
+    marginBottom: 8,
+    paddingHorizontal: 4,
   },
   myMessageContainer: {
     alignItems: 'flex-end',
@@ -536,17 +1071,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#333',
     fontWeight: '600',
-    marginLeft: 8,
+    marginBottom: 4,
   },
   messageRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     maxWidth: '80%',
   },
+  messageContentContainer: {
+    flex: 1,
+    flexDirection: 'column',
+  },
+  bubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  profileImageContainer: {
+    marginRight: 10,
+    marginTop: 2,
+  },
+  messageProfileImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1.5,
+    borderColor: '#ddd',
+  },
+  messageProfilePlaceholder: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFE08C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#ddd',
+  },
+  messageProfileText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   messageBubble: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 18,
+    borderRadius: 16,
     maxWidth: '100%',
   },
   myMessageBubble: {
@@ -556,6 +1125,14 @@ const styles = StyleSheet.create({
   otherMessageBubble: {
     backgroundColor: '#fff',
     borderBottomLeftRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   messageText: {
     fontSize: 15,
@@ -572,6 +1149,59 @@ const styles = StyleSheet.create({
     color: '#666',
     marginHorizontal: 6,
   },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  imageMessageBubble: {
+    padding: 4,
+  },
+  fileMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filePreviewContainer: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  filePreviewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  filePreviewFile: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  filePreviewText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+  },
+  filePreviewActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filePreviewButton: {
+    padding: 8,
+  },
+  filePreviewSendButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 20,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -580,6 +1210,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',
+  },
+  attachButton: {
+    padding: 6,
+    marginRight: 4,
   },
   input: {
     flex: 1,
@@ -636,6 +1270,9 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 12,
   },
+  participantsList: {
+    maxHeight: 250,
+  },
   participantItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -649,6 +1286,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFE08C',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   participantAvatarText: {
     fontSize: 14,
@@ -675,5 +1314,137 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FF6B6B',
     fontWeight: '500',
+  },
+  // 대화상대 추가 모달 스타일
+  addMemberModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addMemberModalContainer: {
+    backgroundColor: '#fff',
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  addMemberHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  addMemberTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  memberList: {
+    maxHeight: 400,
+  },
+  memberSelectItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  memberSelectItemSelected: {
+    backgroundColor: '#f0f9f4',
+  },
+  memberSelectAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFE08C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  memberSelectAvatarText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  memberSelectInfo: {
+    flex: 1,
+  },
+  memberSelectName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  memberSelectId: {
+    fontSize: 13,
+    color: '#666',
+  },
+  emptyContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
+  },
+  addMemberFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    gap: 12,
+  },
+  addMemberCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  addMemberCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  addMemberConfirmButton: {
+    flex: 1,
+    paddingVertical: 14,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  addMemberConfirmButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  addMemberConfirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // 이미지 전체화면 뷰어
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 10,
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
   },
 })

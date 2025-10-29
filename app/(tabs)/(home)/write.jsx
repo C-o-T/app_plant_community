@@ -1,38 +1,38 @@
 import {
   Alert,
-  Keyboard,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
-  Image,
 } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
+import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 import {
   createBoard,
   updateBoard,
   fetchBoardDetail,
   uploadBoardImages,
 } from '../../../services/boardService';
+import { fetchCategoryList } from '../../../services/categoryService';
 
 const WriteBoard = () => {
   const router = useRouter();
   const { boardNum, mode } = useLocalSearchParams();
   const isEditMode = mode === 'edit';
+  const richText = useRef();
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [contentParts, setContentParts] = useState([]); // 텍스트와 이미지를 순서대로 저장
   const [memId, setMemId] = useState('');
-  const [cateNum, setCateNum] = useState(1);
+  const [cateNum, setCateNum] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   // 사용자 정보 가져오기
   useEffect(() => {
@@ -50,6 +50,24 @@ const WriteBoard = () => {
     getUserInfo();
   }, []);
 
+  // 카테고리 목록 가져오기
+  useEffect(() => {
+    const getCategories = async () => {
+      try {
+        const data = await fetchCategoryList();
+        setCategories(data);
+        // 첫 번째 카테고리를 기본값으로 설정
+        if (data.length > 0 && !isEditMode) {
+          setCateNum(data[0].cateNum);
+        }
+      } catch (error) {
+        console.error('카테고리 조회 실패:', error);
+        Alert.alert('오류', '카테고리를 불러올 수 없습니다.');
+      }
+    };
+    getCategories();
+  }, [isEditMode]);
+
   // 수정 모드일 경우 기존 게시글 정보 불러오기
   useEffect(() => {
     if (isEditMode && boardNum) {
@@ -59,10 +77,6 @@ const WriteBoard = () => {
           setTitle(data.title);
           setContent(data.content);
           setCateNum(data.cateNum);
-
-          // 기존 content를 텍스트와 이미지로 파싱
-          const parts = parseContentToParts(data.content);
-          setContentParts(parts);
         } catch (error) {
           console.error('게시글 정보 불러오기 실패:', error);
           Alert.alert('오류', '게시글 정보를 불러올 수 없습니다.');
@@ -72,38 +86,7 @@ const WriteBoard = () => {
     }
   }, [isEditMode, boardNum]);
 
-  // HTML content를 텍스트와 이미지 파트로 파싱
-  const parseContentToParts = (htmlContent) => {
-    const parts = [];
-    const imgRegex = /<img[^>]+src="([^">]+)"[^>]*>/g;
-    let lastIndex = 0;
-    let match;
-
-    while ((match = imgRegex.exec(htmlContent)) !== null) {
-      // 이미지 태그 이전의 텍스트
-      if (match.index > lastIndex) {
-        const text = htmlContent.substring(lastIndex, match.index).trim();
-        if (text) {
-          parts.push({ type: 'text', content: text });
-        }
-      }
-      // 이미지
-      parts.push({ type: 'image', url: match[1] });
-      lastIndex = match.index + match[0].length;
-    }
-
-    // 마지막 이미지 이후의 텍스트
-    if (lastIndex < htmlContent.length) {
-      const text = htmlContent.substring(lastIndex).trim();
-      if (text) {
-        parts.push({ type: 'text', content: text });
-      }
-    }
-
-    return parts;
-  };
-
-  // 이미지 선택 및 업로드
+  // 이미지 선택 및 에디터에 삽입
   const handlePickImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -114,7 +97,7 @@ const WriteBoard = () => {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsMultipleSelection: true,
+        allowsMultipleSelection: false,
         quality: 0.8,
       });
 
@@ -124,11 +107,11 @@ const WriteBoard = () => {
           // 이미지 업로드
           const uploadedUrls = await uploadBoardImages(result.assets);
 
-          // 업로드된 이미지를 contentParts에 추가
-          const newImageParts = uploadedUrls.map(url => ({ type: 'image', url }));
-          setContentParts(prev => [...prev, ...newImageParts]);
-
-          Alert.alert('성공', '이미지가 추가되었습니다.');
+          // 에디터에 이미지 삽입
+          if (uploadedUrls.length > 0) {
+            richText.current?.insertImage(uploadedUrls[0]);
+            Alert.alert('성공', '이미지가 삽입되었습니다.');
+          }
         } catch (error) {
           console.error('이미지 업로드 실패:', error);
           Alert.alert('오류', '이미지 업로드에 실패했습니다.');
@@ -142,24 +125,6 @@ const WriteBoard = () => {
     }
   };
 
-  // 텍스트 입력 처리
-  const handleTextChange = (text) => {
-    setContent(text);
-  };
-
-  // 텍스트 입력이 끝났을 때 contentParts에 추가
-  const handleTextBlur = () => {
-    if (content.trim()) {
-      setContentParts(prev => [...prev, { type: 'text', content }]);
-      setContent('');
-    }
-  };
-
-  // contentPart 삭제
-  const handleRemovePart = (index) => {
-    setContentParts(prev => prev.filter((_, i) => i !== index));
-  };
-
   // 게시글 저장
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -167,32 +132,16 @@ const WriteBoard = () => {
       return;
     }
 
-    // 현재 입력중인 텍스트를 contentParts에 추가
-    const finalParts = [...contentParts];
-    if (content.trim()) {
-      finalParts.push({ type: 'text', content });
-    }
-
-    if (finalParts.length === 0) {
+    if (!content.trim()) {
       Alert.alert('알림', '내용을 입력해주세요.');
       return;
     }
 
     setLoading(true);
     try {
-      // contentParts를 HTML로 변환
-      let finalContent = '';
-      finalParts.forEach(part => {
-        if (part.type === 'text') {
-          finalContent += part.content + '\n';
-        } else if (part.type === 'image') {
-          finalContent += `<img src="${part.url}" alt="image" />\n`;
-        }
-      });
-
       const boardData = {
         title,
-        content: finalContent,
+        content, // RichEditor에서 나온 HTML 그대로 저장
         memId,
         cateNum,
       };
@@ -218,132 +167,95 @@ const WriteBoard = () => {
       setLoading(false);
     }
   };
-  console.log(content)
-  console.log(contentParts)
+
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-        <View style={styles.content}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.pageTitle}>
-              {isEditMode ? '게시글 수정' : '게시글 작성'}
-            </Text>
+      <View style={styles.content}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Text style={styles.pageTitle}>
+            {isEditMode ? '게시글 수정' : '게시글 작성'}
+          </Text>
 
-            {/* 제목 */}
-            <Text style={styles.label}>제목</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="제목을 입력하세요"
-              value={title}
-              onChangeText={setTitle}
+          {/* 제목 */}
+          <Text style={styles.label}>제목</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="제목을 입력하세요"
+            value={title}
+            onChangeText={setTitle}
+          />
+
+          {/* 카테고리 선택 */}
+          <Text style={styles.label}>카테고리</Text>
+          <View style={styles.categoryContainer}>
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category.cateNum}
+                style={[
+                  styles.categoryButton,
+                  cateNum === category.cateNum && styles.categoryButtonActive,
+                ]}
+                onPress={() => setCateNum(category.cateNum)}
+              >
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    cateNum === category.cateNum && styles.categoryButtonTextActive,
+                  ]}
+                >
+                  {category.cateName}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* 내용 - Rich Editor */}
+          <Text style={styles.label}>내용</Text>
+
+          <View style={styles.editorContainer}>
+            <RichEditor
+              ref={richText}
+              onChange={(html) => setContent(html)}
+              placeholder="내용을 입력하세요..."
+              initialContentHTML={content}
+              androidHardwareAccelerationDisabled={true}
+              style={styles.editor}
+              initialHeight={300}
+              editorStyle={{
+                backgroundColor: '#fff',
+                color: '#000',
+                placeholderColor: '#999',
+                contentCSSText: 'font-size: 16px; min-height: 300px; padding: 10px;',
+              }}
             />
 
-            {/* 카테고리 선택 */}
-            <Text style={styles.label}>카테고리</Text>
-            <View style={styles.categoryContainer}>
-              <TouchableOpacity
-                style={[styles.categoryButton, cateNum === 1 && styles.categoryButtonActive]}
-                onPress={() => setCateNum(1)}
-              >
-                <Text
-                  style={[
-                    styles.categoryButtonText,
-                    cateNum === 1 && styles.categoryButtonTextActive,
-                  ]}
-                >
-                  일반
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.categoryButton, cateNum === 2 && styles.categoryButtonActive]}
-                onPress={() => setCateNum(2)}
-              >
-                <Text
-                  style={[
-                    styles.categoryButtonText,
-                    cateNum === 2 && styles.categoryButtonTextActive,
-                  ]}
-                >
-                  질문
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.categoryButton, cateNum === 3 && styles.categoryButtonActive]}
-                onPress={() => setCateNum(3)}
-              >
-                <Text
-                  style={[
-                    styles.categoryButtonText,
-                    cateNum === 3 && styles.categoryButtonTextActive,
-                  ]}
-                >
-                  팁
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <RichToolbar
+              editor={richText}
+              actions={[
+                actions.setBold,
+                actions.setItalic,
+                actions.setUnderline,
+                actions.insertBulletsList,
+                actions.insertOrderedList,
+                actions.insertImage,
+              ]}
+              onPressAddImage={handlePickImage}
+              style={styles.toolbar}
+            />
+          </View>
 
-            {/* 내용 */}
-            <Text style={styles.label}>내용</Text>
-
-            {/* 컨텐츠 영역 - 텍스트와 이미지가 섞여서 표시됨 */}
-            <View style={styles.contentContainer}>
-              {/* 이미 추가된 contentParts 표시 */}
-              {contentParts.map((part, index) => (
-                <View key={index} style={styles.contentPart}>
-                  {part.type === 'text' ? (
-                    <View style={styles.textPart}>
-                      <Text style={styles.textContent}>{part.content}</Text>
-                      <TouchableOpacity
-                        style={styles.removePartButton}
-                        onPress={() => handleRemovePart(index)}
-                      >
-                        <Text style={styles.removeButtonText}>×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={styles.imagePart}>
-                      <Image source={{ uri: part.url }} style={styles.contentImage} />
-                      <TouchableOpacity
-                        style={styles.removePartButton}
-                        onPress={() => handleRemovePart(index)}
-                      >
-                        <Text style={styles.removeButtonText}>×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              ))}
-
-              {/* 현재 입력중인 텍스트 */}
-              <TextInput
-                style={styles.contentInput}
-                placeholder="내용을 입력하세요"
-                value={content}
-                onChangeText={handleTextChange}
-                onBlur={handleTextBlur}
-                multiline
-                textAlignVertical="top"
-              />
-            </View>
-
-            {/* 이미지 선택 */}
-            <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
-              <Text style={styles.imageButtonText}>이미지 선택</Text>
-            </TouchableOpacity>
-
-            {/* 저장 버튼 */}
-            <TouchableOpacity
-              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              <Text style={styles.submitButtonText}>
-                {loading ? '저장 중...' : isEditMode ? '수정하기' : '작성하기'}
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </TouchableWithoutFeedback>
+          {/* 저장 버튼 */}
+          <TouchableOpacity
+            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.submitButtonText}>
+              {loading ? '저장 중...' : isEditMode ? '수정하기' : '작성하기'}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -407,81 +319,24 @@ const styles = StyleSheet.create({
   categoryButtonTextActive: {
     color: '#FFF',
   },
-  contentContainer: {
-    minHeight: 200,
-    borderWidth: 1,
+  editorContainer: {
+    height: 400,
+    marginBottom: 15,
+  },
+  editor: {
+    flex: 1,
     borderColor: '#E0E0E0',
+    borderWidth: 1,
     borderRadius: 8,
-    padding: 15,
-    backgroundColor: '#FFF',
-    marginBottom: 15,
+    backgroundColor: '#fff',
   },
-  contentPart: {
-    marginBottom: 10,
-  },
-  textPart: {
-    position: 'relative',
-    backgroundColor: '#F5F5F5',
-    padding: 10,
-    borderRadius: 8,
-  },
-  textContent: {
-    fontSize: 16,
-    color: '#333',
-    paddingRight: 30,
-  },
-  imagePart: {
-    position: 'relative',
-    marginBottom: 10,
-  },
-  contentImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    resizeMode: 'contain',
-    backgroundColor: '#F0F0F0',
-  },
-  removePartButton: {
-    position: 'absolute',
-    top: 5,
-    right: 5,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FF5252',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  removeButtonText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    lineHeight: 20,
-  },
-  contentInput: {
-    minHeight: 100,
-    fontSize: 16,
-    color: '#333',
-    textAlignVertical: 'top',
-  },
-  imageButton: {
-    backgroundColor: '#FFF',
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  imageButtonText: {
-    color: '#4CAF50',
-    fontSize: 16,
-    fontWeight: 'bold',
+  toolbar: {
+    backgroundColor: '#f5f5f5',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    minHeight: 40,
   },
   submitButton: {
     backgroundColor: '#4CAF50',

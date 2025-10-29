@@ -1,26 +1,28 @@
 // components/myFarm/Calendar.jsx
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { LocaleConfig, Calendar as RNCalendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/myFarmConstant';
 import {
+
   addDiary as apiAddDiary,
   addWateringSchedule as apiAddWatering,
   deleteDiary,
   deleteWateringSchedule,
   fetchDiaries,
   fetchWateringSchedules
+
 } from '../../services/calendarService';
 
 // ✅ ESM/CJS 호환 안전 import (date-holidays)
@@ -256,7 +258,7 @@ const CalendarComponent = () => {
     }
   };
 
-  
+
   // 물주기 일정 삭제
   const handleDeleteWatering = async (wateringId) => {
     Alert.alert(
@@ -498,7 +500,7 @@ const CalendarComponent = () => {
                         <Text style={styles.deleteButtonText}>🗑️</Text>
                       </TouchableOpacity>
                     </View>
-                    
+
                   </View>
                 ))}
               </View>

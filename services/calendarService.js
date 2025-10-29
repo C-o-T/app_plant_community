@@ -72,7 +72,7 @@ export const deleteWateringSchedule = async (wateringId) => {
   const response = await fetch(`${API_BASE_URL}/watering/${wateringId}`, {
     method: 'DELETE',
   });
-    
+
   const text = await response.text();
   console.log('물주기 일정 삭제 응답:', response.status, text);
   
