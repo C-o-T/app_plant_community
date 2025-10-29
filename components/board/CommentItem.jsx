@@ -67,32 +67,7 @@ const CommentItem = ({
       </View>
 
       {/* 댓글 내용 */}
-      {isEditing ? (
-        <View style={styles.editContainer}>
-          <TextInput
-            style={styles.editInput}
-            value={editText}
-            onChangeText={setEditText}
-            multiline
-          />
-          <View style={styles.editButtons}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => {
-                setIsEditing(false);
-                setEditText(comment.content);
-              }}
-            >
-              <Text style={styles.cancelButtonText}>취소</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveEdit}>
-              <Text style={styles.saveButtonText}>저장</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <Text style={styles.content}>{comment.content}</Text>
-      )}
+      {!isEditing && <Text style={styles.content}>{comment.content}</Text>}
 
       {/* 답글 버튼 (부모 댓글만) */}
       {!isReply && !isEditing && (
@@ -119,6 +94,9 @@ const CommentItem = ({
             value={replyText}
             onChangeText={setReplyText}
             multiline
+            autoFocus
+            textAlignVertical="top"
+            blurOnSubmit={false}
           />
           <View style={styles.replyInputButtons}>
             <TouchableOpacity
@@ -155,6 +133,35 @@ const CommentItem = ({
               isReply={true}
             />
           ))}
+        </View>
+      )}
+
+      {/* 수정 입력창 (맨 아래) */}
+      {isEditing && (
+        <View style={styles.editContainer}>
+          <TextInput
+            style={styles.editInput}
+            value={editText}
+            onChangeText={setEditText}
+            multiline
+            autoFocus
+            textAlignVertical="top"
+            blurOnSubmit={false}
+          />
+          <View style={styles.editButtons}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setIsEditing(false);
+                setEditText(comment.content);
+              }}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveButton} onPress={handleSaveEdit}>
+              <Text style={styles.saveButtonText}>저장</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
