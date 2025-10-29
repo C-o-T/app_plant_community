@@ -53,7 +53,14 @@ const apiFetch = async (url, options = {}) => {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    return await response.json()
+    // Content-Type 확인해서 JSON 또는 텍스트로 파싱
+    const contentType = response.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json()
+    } else {
+      // JSON이 아니면 텍스트로 반환
+      return await response.text()
+    }
   } catch (error) {
     clearTimeout(timeoutId)
     if (error.name === 'AbortError') {

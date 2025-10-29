@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, Text, TouchableOpacity, View, Modal, TextInput } from 'react-native'
+import { FlatList, StyleSheet, Text, TouchableOpacity, View, Modal, TextInput, Image } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
@@ -62,25 +62,34 @@ const ChatScreen = () => {
   const connectWebSocket = () => {
     webSocketService.connect(
       () => {
+        console.log('WebSocket 연결 성공 - 전체 메시지 구독 시작')
         // 전체 메시지 구독
         webSocketService.subscribeToAllMessages((message) => {
-          // 해당 채팅방의 마지막 메시지 업데이트
+          console.log('새 메시지 수신:', message)
+          // 해당 채팅방의 마지막 메시지 업데이트 및 맨 위로 이동
           setChatRooms((prevRooms) => {
-            return prevRooms.map((room) => {
+            const updatedRooms = prevRooms.map((room) => {
               if (room.roomId === message.roomId) {
                 return {
                   ...room,
                   lastMessage: message.content,
-                  lastMessageAt: message.sentAt,
+                  lastMessageAt: message.sentAt || new Date().toISOString(),
                 }
               }
               return room
+            })
+
+            // lastMessageAt 기준으로 내림차순 정렬 (최신 메시지가 위로)
+            return updatedRooms.sort((a, b) => {
+              if (!a.lastMessageAt) return 1
+              if (!b.lastMessageAt) return -1
+              return new Date(b.lastMessageAt) - new Date(a.lastMessageAt)
             })
           })
         })
       },
       () => {
-        // WebSocket 연결 실패 시 조용히 처리
+        console.log('WebSocket 연결 실패')
       }
     )
   }
@@ -90,24 +99,32 @@ const ChatScreen = () => {
       // 백엔드 API 호출
       const data = await chatAPI.getMyChatRooms(currentUserId)
 
-      // 회원 정보 조회 (이름 변환용)
+      // 회원 정보 조회 (이름 및 프로필 이미지)
       let memberMap = new Map()
       try {
         const members = await memberAPI.getAllMembers()
+        console.log('채팅방 목록 - 전체 회원 정보:', JSON.stringify(members, null, 2))
         members.forEach(member => {
-          memberMap.set(member.memId, member.memName)
+          memberMap.set(member.memId, {
+            name: member.memName,
+            profileImageUrl: member.profileImageUrl
+          })
         })
+        console.log('채팅방 목록 - memberMap:', Array.from(memberMap.entries()))
       } catch (error) {
         console.warn('회원 정보 로드 실패 - ID로 표시됩니다')
       }
 
-      // 1:1 채팅방의 경우 참여자 정보에서 상대방 이름 가져오기
+      // 1:1 채팅방의 경우 참여자 정보에서 상대방 이름 및 프로필 이미지 가져오기
       const roomsWithNames = data.map((room) => {
         if (room.roomType === 'DIRECT' && !room.roomName && room.participantIds) {
           const participantArray = room.participantIds.split(',').map(id => id.trim())
           const otherUserId = participantArray.find(id => id !== currentUserId)
           if (otherUserId) {
-            room.roomName = memberMap.get(otherUserId) || otherUserId
+            const memberInfo = memberMap.get(otherUserId)
+            room.roomName = memberInfo?.name || otherUserId
+            room.profileImageUrl = memberInfo?.profileImageUrl
+            room.otherUserId = otherUserId
           }
         }
         // 단체 채팅방도 roomName이 null이면 기본값 설정
@@ -117,7 +134,14 @@ const ChatScreen = () => {
         return room
       })
 
-      setChatRooms(roomsWithNames)
+      // lastMessageAt 기준으로 내림차순 정렬 (최신 메시지가 위로)
+      const sortedRooms = roomsWithNames.sort((a, b) => {
+        if (!a.lastMessageAt) return 1
+        if (!b.lastMessageAt) return -1
+        return new Date(b.lastMessageAt) - new Date(a.lastMessageAt)
+      })
+
+      setChatRooms(sortedRooms)
     } catch (error) {
       console.error('채팅방 목록 조회 실패:', error)
       setChatRooms([])
@@ -213,21 +237,34 @@ const ChatScreen = () => {
   const renderChatRoom = ({ item }) => {
     // roomName이 null이거나 undefined인 경우 기본값 설정
     const displayName = item.roomName || '알 수 없는 채팅방'
+    const profileImageUrl = item.profileImageUrl
+      ? `http://192.168.30.97:8080${item.profileImageUrl}?t=${Date.now()}`
+      : null
 
     return (
       <TouchableOpacity
         style={styles.chatRoomItem}
         onPress={() => router.push({
           pathname: '/chat/room',
-          params: { roomId: item.roomId, roomName: displayName }
+          params: {
+            roomId: item.roomId,
+            roomName: displayName
+          }
         })}
       >
         <View style={styles.profileImageContainer}>
-          <View style={styles.profileImage}>
-            <Text style={styles.profileText}>
-              {displayName.charAt(0)}
-            </Text>
-          </View>
+          {profileImageUrl ? (
+            <Image
+              source={{ uri: profileImageUrl }}
+              style={styles.profileImage}
+            />
+          ) : (
+            <View style={styles.profileImage}>
+              <Text style={styles.profileText}>
+                {displayName.charAt(0)}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.chatRoomContent}>
