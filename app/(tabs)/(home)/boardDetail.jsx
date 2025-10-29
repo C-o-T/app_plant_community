@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +20,41 @@ import RenderHtml from 'react-native-render-html';
 import { fetchBoardDetail, deleteBoard } from '../../../services/boardService';
 import { toggleLike, checkLike } from '../../../services/likeService';
 import { fetchComments, createComment, updateComment, deleteComment } from '../../../services/commentService';
+import { fetchProfileImage } from '../../../services/memberService';
 import CommentItem from '../../../components/board/CommentItem';
+
+// 댓글 입력 컴포넌트를 외부로 분리
+const CommentInputComponent = React.memo(
+  ({ commentText, onChangeText, onSubmit, styles }) => {
+    return (
+      <View style={styles.commentInputContainer}>
+        <Text style={styles.sectionTitle}>댓글 작성</Text>
+        <View style={styles.commentInputRow}>
+          <TextInput
+            style={styles.commentInput}
+            placeholder="댓글을 입력하세요"
+            value={commentText}
+            onChangeText={onChangeText}
+            multiline
+            maxLength={500}
+            textAlignVertical="top"
+            blurOnSubmit={false}
+            returnKeyType="default"
+            autoCorrect={false}
+            keyboardType="default"
+          />
+          <TouchableOpacity style={styles.submitButton} onPress={onSubmit}>
+            <Text style={styles.submitButtonText}>작성</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  },
+  (prevProps, nextProps) => {
+    // onChangeText와 onSubmit은 항상 같은 참조를 유지
+    return prevProps.commentText === nextProps.commentText;
+  }
+);
 
 const BoardDetailScreen = () => {
   const router = useRouter();
@@ -33,6 +67,7 @@ const BoardDetailScreen = () => {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState(null);
 
   // 현재 로그인한 사용자 정보 가져오기
   useEffect(() => {
@@ -81,7 +116,27 @@ const BoardDetailScreen = () => {
         if (data.content) {
           data.content = replaceImageUrls(data.content);
         }
+
+        // 카테고리 디버깅
+        console.log('=== 게시글 데이터 ===');
+        console.log('전체 데이터:', data);
+        console.log('categoryDTO:', data.categoryDTO);
+        if (data.categoryDTO) {
+          console.log('cateName:', data.categoryDTO.cateName);
+        } else {
+          console.log('categoryDTO가 없습니다');
+        }
+
         setBoard(data);
+
+        // 프로필 이미지 로드
+        if (data.memId) {
+          // 모든 사용자의 프로필 이미지를 API로 조회
+          const profileImg = await fetchProfileImage(data.memId);
+          if (profileImg) {
+            setProfileImageUrl(profileImg);
+          }
+        }
 
         // 댓글 로드
         await loadComments();
@@ -167,7 +222,7 @@ const BoardDetailScreen = () => {
   };
 
   // 댓글 작성
-  const handleSubmitComment = async () => {
+  const handleSubmitComment = useCallback(async () => {
     if (!currentUser) {
       Alert.alert('알림', '로그인이 필요합니다.');
       return;
@@ -192,7 +247,7 @@ const BoardDetailScreen = () => {
       console.error('댓글 작성 실패:', error);
       Alert.alert('오류', '댓글 작성에 실패했습니다.');
     }
-  };
+  }, [currentUser, commentText, boardNum]);
 
   // 대댓글 작성
   const handleSubmitReply = async (parentCommentNum, replyText) => {
@@ -261,26 +316,6 @@ const BoardDetailScreen = () => {
   // 부모 댓글만 필터링 (대댓글 제외)
   const parentComments = comments.filter((comment) => !comment.parentCommentNum);
 
-  // 댓글 작성 폼 렌더링
-  const renderCommentInput = () => (
-    <View style={styles.commentInputContainer}>
-      <Text style={styles.sectionTitle}>댓글 작성</Text>
-      <View style={styles.commentInputRow}>
-        <TextInput
-          style={styles.commentInput}
-          placeholder="댓글을 입력하세요"
-          value={commentText}
-          onChangeText={setCommentText}
-          multiline
-          maxLength={500}
-        />
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmitComment}>
-          <Text style={styles.submitButtonText}>작성</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
   if (loading) {
     return (
       <SafeAreaView style={styles.centerContainer}>
@@ -305,11 +340,27 @@ const BoardDetailScreen = () => {
     <View style={styles.boardContainer}>
       {/* 헤더 */}
       <View style={styles.header}>
-        <View style={styles.authorInfo}>
-          <Text style={styles.authorName}>{board.memId}</Text>
-          <Text style={styles.date}>
-            {new Date(board.createDate).toLocaleDateString()}
-          </Text>
+        <View style={styles.authorInfoContainer}>
+          {/* 프로필 이미지 */}
+          {profileImageUrl ? (
+            <Image
+              source={{ uri: profileImageUrl }}
+              style={styles.profileImage}
+            />
+          ) : (
+            <View style={styles.defaultProfileImage}>
+              <Text style={styles.defaultProfileText}>
+                {board.memId.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          {/* 작성자 정보 */}
+          <View style={styles.authorInfo}>
+            <Text style={styles.authorName}>{board.memId}</Text>
+            <Text style={styles.date}>
+              {new Date(board.createDate).toLocaleDateString()}
+            </Text>
+          </View>
         </View>
         {isAuthor && (
           <View style={styles.actionButtons}>
@@ -323,15 +374,15 @@ const BoardDetailScreen = () => {
         )}
       </View>
 
-      {/* 제목 */}
-      <Text style={styles.title}>{board.title}</Text>
-
-      {/* 카테고리 */}
-      {board.categoryDTO && (
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>{board.categoryDTO.cateName}</Text>
-        </View>
-      )}
+      {/* 카테고리 + 제목 */}
+      <View style={styles.titleContainer}>
+        {board.categoryDTO && (
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{board.categoryDTO.cateName}</Text>
+          </View>
+        )}
+        <Text style={styles.title}>{board.title}</Text>
+      </View>
 
       {/* 내용 */}
       <RenderHtml
@@ -415,13 +466,12 @@ const BoardDetailScreen = () => {
     </View>
   );
 
-  // ⭐ KeyboardAvoidingView로 감싸기
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={100}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
           data={parentComments}
@@ -437,7 +487,14 @@ const BoardDetailScreen = () => {
             />
           )}
           ListHeaderComponent={renderBoardContent}
-          ListFooterComponent={renderCommentInput}
+          ListFooterComponent={
+            <CommentInputComponent
+              commentText={commentText}
+              onChangeText={setCommentText}
+              onSubmit={handleSubmitComment}
+              styles={styles}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>첫 댓글을 작성해보세요!</Text>
@@ -446,6 +503,8 @@ const BoardDetailScreen = () => {
           refreshing={refreshing}
           onRefresh={handleRefresh}
           contentContainerStyle={styles.flatListContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
         />
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -479,6 +538,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
   },
+  authorInfoContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E0E0E0',
+  },
+  defaultProfileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  defaultProfileText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
   authorInfo: {
     flex: 1,
   },
@@ -506,24 +590,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    flexWrap: 'wrap',
   },
   categoryBadge: {
-    alignSelf: 'flex-start',
     backgroundColor: '#E8F5E9',
-    paddingVertical: 4,
+    paddingVertical: 5,
     paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 15,
+    borderRadius: 15,
+    marginRight: 10,
   },
   categoryText: {
     fontSize: 12,
     color: '#4CAF50',
     fontWeight: 'bold',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
   },
   content: {
     fontSize: 16,
