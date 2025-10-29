@@ -13,6 +13,7 @@ const ChatScreen = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedUsers, setSelectedUsers] = useState([])
   const [groupName, setGroupName] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0) // 강제 리렌더링용
 
   // 로그인한 사용자 정보
   const [currentUserId, setCurrentUserId] = useState('')
@@ -88,6 +89,15 @@ const ChatScreen = () => {
 
           // 해당 채팅방의 마지막 메시지 업데이트 및 맨 위로 이동
           setChatRooms((prevRooms) => {
+            const roomExists = prevRooms.find(room => room.roomId === message.roomId)
+
+            // 새로운 채팅방이면 목록 전체를 다시 불러오기
+            if (!roomExists) {
+              console.log('🆕 새로운 채팅방 감지 - 목록 새로고침')
+              fetchChatRooms()
+              return prevRooms
+            }
+
             const updatedRooms = prevRooms.map((room) => {
               if (room.roomId === message.roomId) {
                 // 내가 보낸 메시지가 아니면 unreadCount 증가
@@ -105,11 +115,15 @@ const ChatScreen = () => {
             })
 
             // lastMessageAt 기준으로 내림차순 정렬 (최신 메시지가 위로)
-            return updatedRooms.sort((a, b) => {
+            const sorted = updatedRooms.sort((a, b) => {
               if (!a.lastMessageAt) return 1
               if (!b.lastMessageAt) return -1
               return new Date(b.lastMessageAt) - new Date(a.lastMessageAt)
             })
+
+            // 강제 리렌더링 트리거
+            setRefreshKey(prev => prev + 1)
+            return sorted
           })
         })
       },
@@ -140,22 +154,51 @@ const ChatScreen = () => {
         console.warn('회원 정보 로드 실패 - ID로 표시됩니다')
       }
 
-      // 1:1 채팅방의 경우 참여자 정보에서 상대방 이름 및 프로필 이미지 가져오기
+      // 채팅방 이름 및 프로필 이미지 설정
       const roomsWithNames = data.map((room) => {
-        if (room.roomType === 'DIRECT' && !room.roomName && room.participantIds) {
-          const participantArray = room.participantIds.split(',').map(id => id.trim())
-          const otherUserId = participantArray.find(id => id !== currentUserId)
-          if (otherUserId) {
-            const memberInfo = memberMap.get(otherUserId)
-            room.roomName = memberInfo?.name || otherUserId
-            room.profileImageUrl = memberInfo?.profileImageUrl
-            room.otherUserId = otherUserId
+        if (!room.participantIds) return room
+
+        const participantArray = room.participantIds.split(',').map(id => id.trim())
+        const otherUserIds = participantArray.filter(id => id !== currentUserId)
+
+        // 1:1 채팅방
+        if (room.roomType === 'DIRECT' && otherUserIds.length === 1) {
+          const otherUserId = otherUserIds[0]
+          const memberInfo = memberMap.get(otherUserId)
+          room.roomName = memberInfo?.name || otherUserId
+          room.profileImageUrl = memberInfo?.profileImageUrl
+          room.otherUserId = otherUserId
+        }
+        // 단체 채팅방
+        else if (room.roomType === 'GROUP') {
+          // roomName이 없으면 참여자 이름으로 동적 생성
+          if (!room.roomName) {
+            const participantNames = otherUserIds
+              .map(id => memberMap.get(id)?.name || id)
+              .filter(name => name)
+
+            if (participantNames.length <= 3) {
+              // 3명 이하: 모든 이름 표시
+              room.roomName = participantNames.join(', ')
+            } else {
+              // 4명 이상: "이름1, 이름2 외 n명"
+              room.roomName = `${participantNames.slice(0, 2).join(', ')} 외 ${participantNames.length - 2}명`
+            }
           }
+
+          // 단체방 프로필 이미지 (최대 4명까지)
+          room.groupProfileImages = otherUserIds
+            .slice(0, 4)
+            .map(id => {
+              const memberInfo = memberMap.get(id)
+              return {
+                memId: id,
+                name: memberInfo?.name || id,
+                profileImageUrl: memberInfo?.profileImageUrl
+              }
+            })
         }
-        // 단체 채팅방도 roomName이 null이면 기본값 설정
-        if (room.roomType === 'GROUP' && !room.roomName) {
-          room.roomName = '단체 채팅방'
-        }
+
         return room
       })
 
@@ -169,6 +212,7 @@ const ChatScreen = () => {
       console.log(`✅ 채팅방 목록 업데이트 완료: ${sortedRooms.length}개`)
       // 배열을 완전히 새로 만들어서 리렌더링 강제
       setChatRooms([...sortedRooms])
+      setRefreshKey(prev => prev + 1) // 강제 리렌더링
     } catch (error) {
       console.error('❌ 채팅방 목록 조회 실패:', error)
       setChatRooms([])
@@ -266,9 +310,8 @@ const ChatScreen = () => {
   const renderChatRoom = ({ item }) => {
     // roomName이 null이거나 undefined인 경우 기본값 설정
     const displayName = item.roomName || '알 수 없는 채팅방'
-    const profileImageUrl = item.profileImageUrl
-      ? `http://192.168.30.97:8080${item.profileImageUrl}?t=${Date.now()}`
-      : null
+    const isGroupChat = item.roomType === 'GROUP'
+    const hasGroupImages = isGroupChat && item.groupProfileImages && item.groupProfileImages.length > 0
 
     return (
       <TouchableOpacity
@@ -292,13 +335,42 @@ const ChatScreen = () => {
           })
         }}
       >
+        {/* 프로필 이미지 영역 */}
         <View style={styles.profileImageContainer}>
-          {profileImageUrl ? (
+          {hasGroupImages ? (
+            // 단체방: 여러 프로필 이미지 표시 (2x2 그리드)
+            <View style={styles.groupProfileContainer}>
+              {item.groupProfileImages.slice(0, 4).map((member) => {
+                const imageUrl = member.profileImageUrl
+                  ? `http://192.168.30.97:8080${member.profileImageUrl}?t=${Date.now()}`
+                  : null
+
+                return (
+                  <View key={member.memId} style={styles.groupProfileItem}>
+                    {imageUrl ? (
+                      <Image
+                        source={{ uri: imageUrl }}
+                        style={styles.groupProfileImage}
+                      />
+                    ) : (
+                      <View style={styles.groupProfileImage}>
+                        <Text style={styles.groupProfileText}>
+                          {member.name.charAt(0)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )
+              })}
+            </View>
+          ) : item.profileImageUrl ? (
+            // 1:1 채팅: 단일 프로필 이미지
             <Image
-              source={{ uri: profileImageUrl }}
+              source={{ uri: `http://192.168.30.97:8080${item.profileImageUrl}?t=${Date.now()}` }}
               style={styles.profileImage}
             />
           ) : (
+            // 기본 이미지
             <View style={styles.profileImage}>
               <Text style={styles.profileText}>
                 {displayName.charAt(0)}
@@ -362,11 +434,12 @@ const ChatScreen = () => {
         </View>
       ) : (
         <FlatList
+          key={refreshKey}
           data={chatRooms}
           renderItem={renderChatRoom}
-          keyExtractor={(item) => item.roomId.toString()}
+          keyExtractor={(item, index) => `${item.roomId}-${refreshKey}-${index}`}
           contentContainerStyle={styles.listContent}
-          extraData={chatRooms}
+          extraData={refreshKey}
           removeClippedSubviews={false}
         />
       )}
@@ -523,6 +596,33 @@ const styles = StyleSheet.create({
   },
   profileText: {
     fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  // 단체방 프로필 이미지 (2x2 그리드)
+  groupProfileContainer: {
+    width: 50,
+    height: 50,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 1,
+  },
+  groupProfileItem: {
+    width: 24,
+    height: 24,
+  },
+  groupProfileImage: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFE08C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: '#fff',
+  },
+  groupProfileText: {
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#333',
   },
