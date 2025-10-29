@@ -44,18 +44,7 @@ const HomeScreen = () => {
         setHasMore(false);
         if (isNewSearch) {
           setBoardList([]);
-          // 검색어가 있을 때만 알람 표시
-          if (searchKeyword && searchKeyword.trim() !== '') {
-            let message = '';
-            if (searchType === 'title') {
-              message = '제목에 일치하는 내용이 없습니다.';
-            } else if (searchType === 'titleAndContent') {
-              message = '내용에 일치하는 내용이 없습니다.';
-            } else if (searchType === 'memId') {
-              message = '작성자에 일치하는 내용이 없습니다.';
-            }
-            Alert.alert('검색 결과 없음', message);
-          }
+          // 알람 제거 - 빈 리스트로 ListEmptyComponent가 표시됨
         }
         return;
       }
@@ -206,6 +195,17 @@ const HomeScreen = () => {
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
+        ListEmptyComponent={
+          !loading && (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {searchKeyword && searchKeyword.trim() !== ''
+                  ? '검색된 결과가 없습니다.'
+                  : '등록된 글이 없습니다.'}
+              </Text>
+            </View>
+          )
+        }
         maxToRenderPerBatch={10}
         contentContainerStyle={styles.listContent}
       />
@@ -281,6 +281,16 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 80,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
   },
   writeButton: {
     position: 'absolute',
