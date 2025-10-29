@@ -83,12 +83,6 @@ const BoardDetailScreen = () => {
         }
         setBoard(data);
 
-        // 좋아요 상태 확인
-        if (currentUser) {
-          const likeStatus = await checkLike(boardNum, currentUser);
-          setIsLiked(likeStatus);
-        }
-
         // 댓글 로드
         await loadComments();
       } catch (error) {
@@ -102,7 +96,22 @@ const BoardDetailScreen = () => {
     if (boardNum) {
       getBoardDetail();
     }
-  }, [boardNum, currentUser]);
+  }, [boardNum]);
+
+  // 좋아요 상태 확인 (별도 useEffect)
+  useEffect(() => {
+    const checkLikeStatus = async () => {
+      if (currentUser && boardNum) {
+        try {
+          const likeStatus = await checkLike(boardNum, currentUser);
+          setIsLiked(likeStatus);
+        } catch (error) {
+          console.error('좋아요 상태 확인 실패:', error);
+        }
+      }
+    };
+    checkLikeStatus();
+  }, [currentUser, boardNum]);
 
   // 좋아요 토글
   const handleLikeToggle = async () => {

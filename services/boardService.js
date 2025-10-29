@@ -40,11 +40,18 @@ export const createBoard = async (boardData) => {
 
 // 게시글 목록 조회 (페이징)
 export const fetchBoardList = async (params = {}) => {
-  const queryParams = new URLSearchParams({
+  const queryParamsObj = {
     nowPage: params.pageNo || 1,
-    searchType: params.searchType || '',
-    searchKeyword: params.searchKeyword || '',
-  }).toString();
+  };
+
+  // searchType과 searchKeyword가 실제 값이 있을 때만 추가 (빈 문자열 제외)
+  if (params.searchKeyword && params.searchKeyword.trim() !== '') {
+    queryParamsObj.searchType = params.searchType;
+    queryParamsObj.searchKeyword = params.searchKeyword.trim();
+  }
+  // 빈 문자열이면 searchType, searchKeyword 파라미터를 아예 보내지 않음
+
+  const queryParams = new URLSearchParams(queryParamsObj).toString();
 
   const response = await fetch(`${API_BASE_URL}/boards/boardList-paging?${queryParams}`);
 
