@@ -70,6 +70,11 @@ const MyPageScreen = () => {
               onPress={() => router.push('/myPage/editProfile')}
             />
             <Button
+              title='내 정보 변경'
+              backgroundColor={colors.MAIN}
+              onPress={() => router.push('/myPage/editInfo')}
+            />
+            <Button
               title='로그아웃'
               backgroundColor={colors.SUB1}
               textColor={colors.BLACK}

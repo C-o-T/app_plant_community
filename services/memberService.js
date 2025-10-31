@@ -63,3 +63,113 @@ export const clearMembersCache = () => {
   membersCache = null;
   cacheTime = null;
 };
+
+// 회원 상세 정보 조회
+export const getMemberDetail = async (memId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/members/${memId}`);
+    if (!response.ok) {
+      throw new Error('회원 정보 조회 실패');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('회원 정보 조회 오류:', error);
+    throw error;
+  }
+};
+
+// 회원 정보 수정
+export const updateMember = async (memId, memberData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/members/${memId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(memberData),
+    });
+
+    if (!response.ok) {
+      throw new Error('회원 정보 수정 실패');
+    }
+
+    // 캐시 초기화
+    clearMembersCache();
+
+    return await response.json();
+  } catch (error) {
+    console.error('회원 정보 수정 오류:', error);
+    throw error;
+  }
+};
+
+// 회원 탈퇴
+export const withdrawMember = async (memId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/members/${memId}/withdraw`, {
+      method: 'PUT',
+    });
+
+    if (!response.ok) {
+      throw new Error('회원 탈퇴 실패');
+    }
+
+    // 캐시 초기화
+    clearMembersCache();
+
+    return await response.json();
+  } catch (error) {
+    console.error('회원 탈퇴 오류:', error);
+    throw error;
+  }
+};
+
+// 연락처 중복 확인
+export const checkTell = async (memTell) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/members/checkTell/${memTell}`);
+    if (!response.ok) {
+      throw new Error('연락처 중복 확인 실패');
+    }
+    return await response.json(); // 0: 사용 가능, 1: 중복
+  } catch (error) {
+    console.error('연락처 중복 확인 오류:', error);
+    throw error;
+  }
+};
+
+// 사업자등록번호 중복 확인
+export const checkBusinessNum = async (memBusinessNum) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/members/checkBusinessNum/${memBusinessNum}`);
+    if (!response.ok) {
+      throw new Error('사업자등록번호 중복 확인 실패');
+    }
+    return await response.json(); // 0: 사용 가능, 1: 중복
+  } catch (error) {
+    console.error('사업자등록번호 중복 확인 오류:', error);
+    throw error;
+  }
+};
+
+// 푸시 토큰 저장
+export const updatePushToken = async (memId, pushToken) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/members/${memId}/pushToken`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pushToken }),
+    });
+
+    if (!response.ok) {
+      throw new Error('푸시 토큰 저장 실패');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('푸시 토큰 저장 오류:', error);
+    throw error;
+  }
+};

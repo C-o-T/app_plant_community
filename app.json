@@ -31,6 +31,10 @@
       ],
       "package": "com.anonymous.app_plant_community"
     },
+    "notification": {
+      "icon": "./assets/images/icon.png",
+      "color": "#4CAF50"
+    },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
