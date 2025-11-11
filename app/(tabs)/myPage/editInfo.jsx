@@ -476,7 +476,7 @@ const EditInfo = () => {
                 title="수정하기"
                 onPress={handleUpdate}
                 backgroundColor={colors.MAIN}
-                size='small'
+                size="small"
               />
             </View>
           </TouchableOpacity>

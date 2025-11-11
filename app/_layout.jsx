@@ -16,8 +16,8 @@ const RootLayout = () => {
         // 로그인 정보가 있으면 메인 화면으로
         router.replace('/(tabs)');
 
-        // 푸시 알림 토큰 등록
-        registerPushToken();
+        // 푸시 알림 토큰 등록 (에뮬레이터에서는 주석 처리)
+        // registerPushToken();
       } else {
         // 로그인 정보가 없으면 로그인 화면으로
         router.replace('/auth/login');
@@ -25,21 +25,21 @@ const RootLayout = () => {
     };
     checkAuth();
 
-    // 푸시 알림 리스너 설정
-    notificationListener.current = setupNotificationListeners(
-      (notification) => {
-        // 알림 수신 시 처리 (앱이 foreground일 때)
-        console.log('새 알림:', notification);
-      },
-      (response) => {
-        // 알림 클릭 시 처리
-        const data = response.notification.request.content.data;
-        if (data?.boardNum) {
-          // 게시글 알림이면 해당 게시글로 이동
-          router.push(`/(tabs)/(home)/boardDetail?boardNum=${data.boardNum}`);
-        }
-      }
-    );
+    // 푸시 알림 리스너 설정 (에뮬레이터에서는 주석 처리)
+    // notificationListener.current = setupNotificationListeners(
+    //   (notification) => {
+    //     // 알림 수신 시 처리 (앱이 foreground일 때)
+    //     console.log('새 알림:', notification);
+    //   },
+    //   (response) => {
+    //     // 알림 클릭 시 처리
+    //     const data = response.notification.request.content.data;
+    //     if (data?.boardNum) {
+    //       // 게시글 알림이면 해당 게시글로 이동
+    //       router.push(`/(tabs)/(home)/boardDetail?boardNum=${data.boardNum}`);
+    //     }
+    //   }
+    // );
 
     // cleanup
     return () => {
