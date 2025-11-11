@@ -63,8 +63,7 @@ const EditProfile = () => {
 
       // 이미지 파일 추가
       const filename = selectedImage.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      const type = 'image/jpeg';
 
       formData.append('profileImage', {
         uri: selectedImage,
