@@ -152,7 +152,7 @@ const HomeScreen = () => {
                 searchType === 'titleAndContent' && styles.searchTypeTextActive,
               ]}
             >
-              내용
+              제목 + 내용
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
