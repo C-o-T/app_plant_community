@@ -89,7 +89,20 @@ const BoardDetailScreen = () => {
   const loadComments = async () => {
     try {
       const data = await fetchComments(boardNum);
-      setComments(data);
+
+      // 중첩된 구조(replies)를 평평한 배열로 변환
+      const flatComments = [];
+      data.forEach(comment => {
+        // 부모 댓글 추가
+        flatComments.push(comment);
+
+        // 대댓글(replies)이 있으면 평평한 배열에 추가
+        if (comment.replies && comment.replies.length > 0) {
+          flatComments.push(...comment.replies);
+        }
+      });
+
+      setComments(flatComments);
     } catch (error) {
       console.error('댓글 조회 실패:', error);
     } finally {
